@@ -86,4 +86,13 @@ public class EmiScheduleController {
                         .build()
         );
     }
+
+    @PostMapping("/loan/{loanAccountId}/recalculate")
+    public ResponseEntity<List<EmiScheduleResponse>> recalculate(
+            @PathVariable Integer loanAccountId) {
+
+        return ResponseEntity.ok(
+                emiScheduleService.recalculateEmiSchedule(
+                        loanAccountId));
+    }
 }

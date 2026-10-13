@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.example.Loan.main.service.EmiPaymentService.EmailService;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepo;
     private final ModelMapper mapper;
+    private final EmailService emailService;
 
     @Override
     @Transactional(readOnly = true)
@@ -145,17 +147,13 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public void sendEmail(String email, String subject, String message) {
-
-        log.info("Email sending requested. Recipient: {}, Subject: {}",
-                email, subject);
-
-        // Email implementation will be added later.
-        log.debug("Email sending is not implemented yet.");
+        emailService.sendEmail(email, subject, message);
     }
+
 
     @Override
     @Transactional
-    public void createEmiReminder(
+    public boolean createEmiReminder(
             Integer customerId,
             String title,
             String message,
@@ -172,9 +170,6 @@ public class NotificationServiceImpl implements NotificationService {
                     "EMI reminder message cannot be empty");
         }
 
-        log.info("Creating EMI reminder. Customer ID: {}, EMI ID: {}",
-                customerId, emiScheduleId);
-
         LocalDateTime start = LocalDate.now().atStartOfDay();
         LocalDateTime end = start.plusDays(1);
 
@@ -188,9 +183,10 @@ public class NotificationServiceImpl implements NotificationService {
                 .isPresent();
 
         if (alreadyExists) {
-            log.info("Duplicate EMI reminder skipped. Customer ID: {}, EMI ID: {}",
+            log.info(
+                    "Duplicate EMI reminder skipped. Customer ID: {}, EMI ID: {}",
                     customerId, emiScheduleId);
-            return;
+            return false;
         }
 
         Notification notification = new Notification();
@@ -204,8 +200,11 @@ public class NotificationServiceImpl implements NotificationService {
 
         notificationRepo.save(notification);
 
-        log.info("EMI reminder created successfully. Customer ID: {}, EMI ID: {}",
+        log.info(
+                "EMI reminder created. Customer ID: {}, EMI ID: {}",
                 customerId, emiScheduleId);
+
+        return true;
     }
 
     private NotificationType parseNotificationType(String notificationType) {

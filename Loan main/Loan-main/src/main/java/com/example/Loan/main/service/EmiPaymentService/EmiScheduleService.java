@@ -15,4 +15,7 @@ public interface EmiScheduleService {
 
     List<EmiScheduleResponse> generateEmiSchedule(Integer loanAccountId);
 
+    List<EmiScheduleResponse> recalculateEmiSchedule(
+            Integer loanAccountId);
+
 }

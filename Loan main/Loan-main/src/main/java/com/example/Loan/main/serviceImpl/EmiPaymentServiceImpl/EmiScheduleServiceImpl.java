@@ -212,6 +212,88 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
                 .toList();
     }
 
+
+    @Override
+    @Transactional
+    public List<EmiScheduleResponse> recalculateEmiSchedule(Integer loanId) {
+
+        log.info("Partial closure EMI recalculation started for loanId: {}", loanId);
+
+        LoanAccount account = accountRepo.findById(loanId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Loan account not found: " + loanId));
+
+        LoanDeal deal = dealRepo.findById(account.getDealId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Loan deal not found: " + account.getDealId()));
+
+        List<EmiSchedule> list =
+                emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId);
+
+        LoanClosure closure = closureRepo
+                .findFirstByLoanAccountIdAndClosureStatusAndIsProcessedFalseOrderByClosureDateAsc(
+                        loanId, "COMPLETED")
+                .orElseThrow(() -> new LoanClosureException(
+                        "No unprocessed completed loan closure found for loanId: " + loanId));
+
+        if (!"PARTIAL".equalsIgnoreCase(closure.getClosureType())) {
+            throw new LoanClosureException(
+                    "EMI recalculation is allowed only after partial closure");
+        }
+
+        BigDecimal paidPrincipal = list.stream()
+                .filter(e -> e.getStatus() == EmiStatus.PAID)
+                .map(EmiSchedule::getPrincipalAmount)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal settlement = closure.getFinalSettlementAmount() == null
+                ? BigDecimal.ZERO
+                : closure.getFinalSettlementAmount();
+
+        Disbursement disbursement = disbursementRepo
+                .findByDealId(account.getDealId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Disbursement not found for Deal ID: " + account.getDealId()));
+
+        BigDecimal originalPrincipal = disbursement.getDisburseAmount();
+
+        if (originalPrincipal == null || settlement.compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidLoanDataException(
+                    "Invalid disbursed amount or partial settlement amount");
+        }
+
+        BigDecimal outstanding = originalPrincipal
+                .subtract(paidPrincipal)
+                .subtract(settlement);
+
+        if (outstanding.compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidLoanDataException(
+                    "Partial settlement exceeds the outstanding principal");
+        }
+
+        if (outstanding.compareTo(BigDecimal.ZERO) == 0) {
+            list.stream()
+                    .filter(e -> e.getStatus() == EmiStatus.PENDING)
+                    .forEach(e -> e.setStatus(EmiStatus.CLOSED));
+
+            emiRepo.saveAll(list);
+        } else {
+            recalculate(list, outstanding, deal.getInterestRate());
+        }
+
+        closure.setIsProcessed(true);
+        closureRepo.save(closure);
+
+        log.info("Partial closure recalculation completed for loanId: {}", loanId);
+
+        return emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId)
+                .stream()
+                .map(e -> mapper.map(e, EmiScheduleResponse.class))
+                .toList();
+    }
+
+
     private void createSchedule(
             Integer loanId,
             BigDecimal principalAmount,

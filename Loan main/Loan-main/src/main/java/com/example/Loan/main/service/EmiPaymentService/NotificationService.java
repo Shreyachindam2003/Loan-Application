@@ -28,9 +28,11 @@ public interface NotificationService {
             String subject,
             String message);
 
-    void createEmiReminder(
+
+    boolean createEmiReminder(
             Integer customerId,
             String title,
             String message,
             Integer emiScheduleId);
+
 }
