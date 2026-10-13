@@ -76,4 +76,4 @@ public class ScoreCardServiceImpl implements ScoreCardService {
 
         return modelMapper.map(card, ScoreCardResponse.class);
     }
-}
+}//dada

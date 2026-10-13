@@ -20,4 +20,4 @@ public interface LoanDealRepository
     Optional<LoanDeal> findByIdForUpdate(
             @Param("dealId") Integer dealId
     );
-}
+}//dada

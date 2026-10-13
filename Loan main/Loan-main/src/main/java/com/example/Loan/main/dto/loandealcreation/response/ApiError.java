@@ -6,7 +6,7 @@ public record ApiError(
         String code,
         List<String> details
 ) {
-
+    //dada
     public ApiError {
         details = details == null
                 ? List.of()

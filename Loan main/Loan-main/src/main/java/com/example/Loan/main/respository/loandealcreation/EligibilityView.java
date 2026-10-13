@@ -15,4 +15,4 @@ public interface EligibilityView {
     BigDecimal getLoanAmount();
 
     String getRiskCategory();
-}
+}//dada

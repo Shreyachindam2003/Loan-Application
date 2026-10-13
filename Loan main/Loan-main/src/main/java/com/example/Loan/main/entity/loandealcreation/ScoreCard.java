@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 public class ScoreCard {
-
+    //dada
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "ScoreCardId")

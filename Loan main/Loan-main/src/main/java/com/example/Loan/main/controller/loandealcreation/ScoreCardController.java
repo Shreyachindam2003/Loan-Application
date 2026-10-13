@@ -22,7 +22,7 @@ public class ScoreCardController {
                 service.generate(customerId)
         );
     }
-
+    //dada
     @GetMapping("/{scoreCardId}")
     public ResponseApi<ScoreCardResponse> getById(
             @PathVariable("scoreCardId") Integer scoreCardId

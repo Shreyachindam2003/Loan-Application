@@ -31,4 +31,4 @@ public interface ScoreCardRepository
     Optional<com.example.Loan.main.repository.loandealcreation.EligibilityView> findLatestEligibility(
             @Param("customerId") Integer customerId
     );
-}
+}//dada

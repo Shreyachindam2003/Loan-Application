@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 public class LoanDeal {
-
+    //dada
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "DealId")

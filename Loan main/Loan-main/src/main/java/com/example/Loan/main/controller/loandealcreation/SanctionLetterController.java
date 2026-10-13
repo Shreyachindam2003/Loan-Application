@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 public class SanctionLetterController {
 
     private final SanctionLetterService service;
-
+    //dada
     @PostMapping("/deals/{dealId}")
     public ResponseApi<SanctionLetterResponse> generate(
             @PathVariable("dealId") Integer dealId

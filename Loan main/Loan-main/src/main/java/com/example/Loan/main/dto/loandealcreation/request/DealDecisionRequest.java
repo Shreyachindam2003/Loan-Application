@@ -11,7 +11,7 @@ public record DealDecisionRequest(
         @Size(max = 1000, message = "Remarks cannot exceed 1000 characters")
         String remarks
 ) {
-
+    //dada
     public enum Decision {
         APPROVED,
         REJECTED

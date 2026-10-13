@@ -31,7 +31,7 @@ public class LoanDealController {
                         service.apply(customerId, request)
                 ));
     }
-
+    //dada
     @GetMapping("/pending")
     public ResponseEntity<ResponseApi<List<LoanDealResponse>>> pending() {
         return ResponseEntity.ok(

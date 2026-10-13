@@ -9,4 +9,4 @@ public interface SanctionLetterRepository
         extends JpaRepository<SanctionLetter, Integer> {
 
     Optional<SanctionLetter> findByDealId(Integer dealId);
-}
+}//dada

@@ -1,12 +1,10 @@
 package com.example.Loan.main.dto.loandealcreation.response;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ResponseApi<T> {
@@ -28,4 +26,4 @@ public class ResponseApi<T> {
     ) {
         return new ResponseApi<>(false, message, data);
     }
-}
+}//dada

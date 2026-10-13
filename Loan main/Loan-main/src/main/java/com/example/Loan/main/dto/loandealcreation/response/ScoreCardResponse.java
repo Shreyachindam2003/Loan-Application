@@ -12,4 +12,4 @@ public record ScoreCardResponse(
         String status,
         LocalDateTime generatedAt
 ) {
-}
+}//dada

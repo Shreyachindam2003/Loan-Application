@@ -14,4 +14,4 @@ public interface LoanAccountRepository
     List<LoanAccount> findByCustomerIdOrderByCreatedAtDesc(
             Integer customerId
     );
-}
+}//dada

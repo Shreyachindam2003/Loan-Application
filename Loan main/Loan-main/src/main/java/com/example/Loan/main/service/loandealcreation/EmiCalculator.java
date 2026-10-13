@@ -50,4 +50,4 @@ public class EmiCalculator {
         return BigDecimal.valueOf(emi)
                 .setScale(2, RoundingMode.HALF_UP);
     }
-}
+}//dada

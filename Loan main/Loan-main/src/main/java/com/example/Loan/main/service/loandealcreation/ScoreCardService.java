@@ -7,4 +7,4 @@ public interface ScoreCardService {
     ScoreCardResponse generate(Integer customerId);
 
     ScoreCardResponse getById(Integer scoreCardId);
-}
+}//dada

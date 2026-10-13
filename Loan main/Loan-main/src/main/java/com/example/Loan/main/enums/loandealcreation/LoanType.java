@@ -8,7 +8,7 @@ public enum LoanType {
     HOME("15.00");
 
     private final BigDecimal annualRate;
-
+    //dada
     LoanType(String annualRate) {
         this.annualRate = new BigDecimal(annualRate);
     }

@@ -9,4 +9,4 @@ public interface SanctionLetterService {
     SanctionLetterResponse getById(Integer sanctionId);
 
     byte[] downloadPdf(Integer sanctionId);
-}
+}//dada

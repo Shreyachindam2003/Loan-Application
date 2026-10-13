@@ -15,4 +15,4 @@ public interface LoanDealService {
     LoanDealResponse getById(Integer dealId);
 
     List<LoanDealResponse> getPendingDeals();
-}
+}//dada
