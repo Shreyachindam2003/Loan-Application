@@ -1,15 +1,16 @@
 package com.example.Loan.main.config.auth;
 
-import com.example.loanapplication.entity.auth.Role;
-import com.example.loanapplication.entity.auth.User;
-import com.example.loanapplication.repository.auth.RoleRepository;
-import com.example.loanapplication.repository.auth.UserRepository;
+
+import com.example.Loan.main.respository.auth.RoleRepository;
+import com.example.Loan.main.respository.auth.UserRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+
+import javax.management.relation.Role;
 
 @Configuration
 public class OAuth2Config {

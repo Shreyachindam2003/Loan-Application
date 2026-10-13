@@ -1,6 +1,6 @@
 package com.example.Loan.main.serviceImpl.auth;
 
-import com.example.loanapplication.service.auth.EmailService;
+import com.example.Loan.main.service.auth.EmailService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
