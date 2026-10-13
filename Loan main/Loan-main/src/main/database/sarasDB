@@ -38,3 +38,12 @@ ADD COLUMN AttachmentPath VARCHAR(1000) NULL AFTER Response;
 
 
 ------------------------------------
+API
+Post - http://localhost:8080/api/support/tickets  ,
+Get - http://localhost:8080/api/support/tickets/13  ,
+Get - http://localhost:8080/api/support/tickets/customer/1  ,
+Get - http://localhost:8080/api/admin/support/tickets  ,
+Post - http://localhost:8080/api/admin/support/tickets/13/responses  ,
+Get - http://localhost:8080/api/notifications/user/2 ,
+Get - http://localhost:8080/api/notifications/customer/1  ,
+Patch - http://localhost:8080/api/notifications/4/read  ,
