@@ -5,10 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="1523d5e1-24da-46b9-9f9d-b627e3a162f5" name="Changes" comment="first commit">
-      <change beforePath="$PROJECT_DIR$/Loan main/Loan-main/src/main/java/com/example/Loan/main/controller/cibilController/CibilController.java" beforeDir="false" afterPath="$PROJECT_DIR$/Loan main/Loan-main/src/main/java/com/example/Loan/main/controller/cibilController/CibilController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Loan main/Loan-main/src/main/java/com/example/Loan/main/entity/kycEntity/User.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Loan main/Loan-main/src/main/java/com/example/Loan/main/respository/cibilRespository/UserRepository.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Loan main/Loan-main/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/Loan main/Loan-main/src/main/resources/application.properties" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -25,7 +22,7 @@
   <component name="Git.Settings">
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="main" />
+        <entry key="$PROJECT_DIR$" value="sakshi-test" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -59,7 +56,7 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "Spring Boot.LoanMainApplication.executor": "Run",
     "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "sakshi-test",
+    "git-widget-placeholder": "sakshi-main",
     "git.auto.fetch.suggestion.counter": "1",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "C:/sakshi shahu/Loan-Application",
@@ -98,7 +95,23 @@
       <option name="project" value="LOCAL" />
       <updated>1791487225855</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="first commit">
+      <option name="closed" value="true" />
+      <created>1791905467874</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1791905467875</updated>
+    </task>
+    <task id="LOCAL-00003" summary="first commit">
+      <option name="closed" value="true" />
+      <created>1791905541043</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1791905541043</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
