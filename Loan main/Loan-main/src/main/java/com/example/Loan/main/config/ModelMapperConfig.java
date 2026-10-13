@@ -1,4 +1,4 @@
-package com.example.Loan.main.dto.cibilDto;
+package com.example.Loan.main.config;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.context.annotation.Bean;
