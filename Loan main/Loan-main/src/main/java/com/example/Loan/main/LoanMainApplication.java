@@ -7,7 +7,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class LoanMainApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(LoanMainApplication.class, args);
+		SpringApplication.run(
+				LoanMainApplication.class,
+				args
+		);
 	}
-
+	//dada
 }
