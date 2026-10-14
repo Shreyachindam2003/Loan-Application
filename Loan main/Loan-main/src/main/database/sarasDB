@@ -1,0 +1,80 @@
+-- ------------------------------------------------------------
+-- CIBIL reports
+-- ------------------------------------------------------------
+CREATE TABLE CibilReports (
+    CibilReportId INT NOT NULL AUTO_INCREMENT,
+    CustomerId INT NOT NULL,
+    PanNo VARCHAR(255) NULL,
+    CibilScore INT NULL,
+    CheckDate DATETIME(6) NULL,
+    Status VARCHAR(255) NULL,
+    PRIMARY KEY (CibilReportId),
+    UNIQUE KEY UX_CibilReports_CustomerId (CustomerId),
+    CONSTRAINT FK_CibilReports_Customers
+        FOREIGN KEY (CustomerId)
+        REFERENCES Customers(CustomerId)
+) ENGINE=InnoDB;
+
+
+
+-- ------------------------------------------------------------
+-- CIBIL reports
+-- ------------------------------------------------------------
+CREATE TABLE CibilReports (
+    CibilReportId INT NOT NULL AUTO_INCREMENT,
+    CustomerId INT NOT NULL,
+    PanNo VARCHAR(255) NULL,
+    CibilScore INT NULL,
+    CheckDate DATETIME(6) NULL,
+    Status VARCHAR(255) NULL,
+    PRIMARY KEY (CibilReportId),
+    UNIQUE KEY UX_CibilReports_CustomerId (CustomerId),
+    CONSTRAINT FK_CibilReports_Customers
+        FOREIGN KEY (CustomerId)
+        REFERENCES Customers(CustomerId)
+) ENGINE=InnoDB;
+
+
+
+-- ------------------------------------------------------------
+-- Customers
+-- ------------------------------------------------------------
+drop table Customers;
+CREATE TABLE Customers (
+    CustomerId INT NOT NULL AUTO_INCREMENT,
+    FirstName VARCHAR(255) NOT NULL,
+    LastName VARCHAR(255) NULL,
+    Email VARCHAR(255) NOT NULL,
+    Password VARCHAR(255) NULL,
+    MobileNo VARCHAR(255) NULL,
+    AadhaarNo VARCHAR(255) NULL,
+    PanNo VARCHAR(255) NULL,
+    Age INT NULL,
+    EmploymentType VARCHAR(255) NULL,
+    MonthlyIncome DECIMAL(38,2) NULL,
+    MonthlyInvestment DECIMAL(38,2) NULL,
+    IsEmailVerified BIT(1) NOT NULL,
+    VerificationOtpHash VARCHAR(255) NULL,
+    VerificationOtpExpiry DATETIME(6) NULL,
+    CreatedAt DATETIME(6) NOT NULL,
+
+    PRIMARY KEY (CustomerId),
+    UNIQUE KEY UX_Customers_Email (Email)
+) ENGINE=InnoDB;
+
+
+
+-- ------------------------------------------------------------
+-- KYC documents
+-- ------------------------------------------------------------
+CREATE TABLE KycDocuments (
+    DocumentId INT NOT NULL AUTO_INCREMENT,
+    CustomerId INT NOT NULL,
+    DocumentType VARCHAR(100) NOT NULL,
+    FilePath VARCHAR(1000) NULL,
+    VerificationStatus VARCHAR(50) NULL,
+    PRIMARY KEY (DocumentId),
+    KEY IX_KycDocuments_CustomerId (CustomerId),
+    CONSTRAINT FK_KycDocuments_Customers
+        FOREIGN KEY (CustomerId) REFERENCES Customers(CustomerId)
+) ENGINE=InnoDB;

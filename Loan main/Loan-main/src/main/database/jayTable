@@ -1,0 +1,173 @@
+CREATE TABLE IF NOT EXISTS LoanDecisionEmails (
+    EmailId BIGINT NOT NULL AUTO_INCREMENT,
+    DealId INT NOT NULL,
+    Recipient VARCHAR(255) NOT NULL,
+    Subject VARCHAR(255) NOT NULL,
+    Body TEXT NOT NULL,
+
+    Status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    Attempts INT NOT NULL DEFAULT 0,
+
+    NextAttemptAt DATETIME(6)
+        NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+
+    CreatedAt DATETIME(6)
+        NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+
+    SentAt DATETIME(6) NULL,
+
+    PRIMARY KEY (EmailId),
+    UNIQUE KEY UK_LoanDecisionEmails_DealId (DealId),
+
+    CONSTRAINT FK_LoanDecisionEmails_LoanDeals
+        FOREIGN KEY (DealId)
+        REFERENCES LoanDeals (DealId)
+);
+
+
+
+
+USE LoanApp;
+
+ALTER TABLE EligibilityResults
+    ADD COLUMN RiskCategory VARCHAR(50) NULL;
+
+ALTER TABLE ScoreCards
+    ADD COLUMN EligibilityId INT NULL,
+    ADD CONSTRAINT FK_ScoreCards_EligibilityResults
+
+
+
+INSERT INTO EligibilityResults (
+    CustomerId,
+    CibilScore,
+    IsEligible,
+    LoanAmount,
+    RiskCategory
+)
+VALUES (
+    1,
+    820,
+    TRUE,
+    500000.00,
+    'LOW'
+);
+        FOREIGN KEY (EligibilityId)
+        REFERENCES EligibilityResults(EligibilityId),
+    ADD CONSTRAINT UX_ScoreCards_EligibilityId
+        UNIQUE (EligibilityId);
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+
+
+
+INSERT INTO Customers (
+    FirstName,
+    LastName,
+    Email,
+    MonthlyIncome
+)
+VALUES (
+    'Test',
+    'Customer',
+    CONCAT('loan-test-', UUID(), '@example.com'),
+    80000.00
+);
+
+SET @testCustomerId = LAST_INSERT_ID();
+
+INSERT INTO EligibilityResults (
+    CustomerId,
+    CibilScore,
+    IsEligible,
+    LoanAmount,
+    RiskCategory
+)
+VALUES (
+    @testCustomerId,
+    820,
+    TRUE,
+    500000.00,
+    'LOW'
+);
+
+SELECT @testCustomerId AS CustomerId;
+
+
+USE LoanApp;
+
+ALTER TABLE LoanDeals
+    ADD COLUMN ScoreCardId INT NULL,
+    ADD COLUMN EligibleAmountAtApplication DECIMAL(18,2) NULL,
+    ADD COLUMN RequestedDisbursementDate DATE NULL,
+    ADD COLUMN Status VARCHAR(50) NULL,
+    ADD COLUMN CreatedAt DATETIME(6)
+        NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    ADD CONSTRAINT FK_LoanDeals_ScoreCards
+        FOREIGN KEY (ScoreCardId)
+        REFERENCES ScoreCards(ScoreCardId);
+
+
+USE LoanApp;
+
+ALTER TABLE DealReviews
+    ADD COLUMN Remarks VARCHAR(1000) NULL,
+    ADD COLUMN ReviewedAt DATETIME(6) NULL;
+
+CREATE TABLE LoanDecisionEmails (
+    EmailId BIGINT NOT NULL AUTO_INCREMENT,
+    DealId INT NOT NULL,
+    Recipient VARCHAR(255) NOT NULL,
+    Subject VARCHAR(255) NOT NULL,
+    Body TEXT NOT NULL,
+    Status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    Attempts INT NOT NULL DEFAULT 0,
+    NextAttemptAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    SentAt DATETIME(6) NULL,
+    PRIMARY KEY (EmailId),
+    UNIQUE KEY UX_LoanDecisionEmails_DealId (DealId),
+    CONSTRAINT FK_LoanDecisionEmails_LoanDeals
+        FOREIGN KEY (DealId) REFERENCES LoanDeals(DealId)
+);
+
+
+INSERT INTO Users (
+    RoleId,
+    FirstName,
+    LastName,
+    Email
+)
+SELECT
+    RoleId,
+    'Test',
+    'Officer',
+    CONCAT('officer-', UUID(), '@example.com')
+FROM Roles
+WHERE RoleName = 'Loan Officer';
+
+SELECT LAST_INSERT_ID() AS OfficerId;
+
+ALTER TABLE SanctionLetters
+    ADD CONSTRAINT UX_SanctionLetters_DealId UNIQUE (DealId);
+
+ALTER TABLE DealReviews
+    ADD COLUMN ReviewedAt DATETIME(6) NULL;
+
+
+ALTER TABLE Disbursements
+    ADD CONSTRAINT UX_Disbursements_DealId UNIQUE (DealId);
+
+ALTER TABLE LoanAccounts
+    ADD CONSTRAINT UX_LoanAccounts_DealId UNIQUE (DealId);
+
+
+
+    USE LoanApp;
+
+    ALTER TABLE LoanDeals
+    ADD COLUMN AccountHolderName VARCHAR(200) NULL,
+    ADD COLUMN PreferredDisbursementDate DATE NULL,
+    ADD COLUMN DealStatus VARCHAR(50) NULL DEFAULT 'SUBMITTED',
+    ADD COLUMN CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6);
