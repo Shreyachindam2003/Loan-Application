@@ -27,7 +27,8 @@ public class NotificationServiceImpl implements NotificationService {
     public List<NotificationResponse> getUserNotifications(Integer userId) {
         return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId)
                 .stream()
-                .map(notification -> modelMapper.map(notification, NotificationResponse.class))
+                .map(notification ->
+                        modelMapper.map(notification, NotificationResponse.class))
                 .toList();
     }
 
@@ -35,7 +36,8 @@ public class NotificationServiceImpl implements NotificationService {
     public List<NotificationResponse> getCustomerNotifications(Integer customerId) {
         return notificationRepository.findByCustomerIdOrderByCreatedAtDesc(customerId)
                 .stream()
-                .map(notification -> modelMapper.map(notification, NotificationResponse.class))
+                .map(notification ->
+                        modelMapper.map(notification, NotificationResponse.class))
                 .toList();
     }
 
@@ -48,9 +50,41 @@ public class NotificationServiceImpl implements NotificationService {
                         ));
 
         notification.setIsRead(true);
+
         return modelMapper.map(
                 notificationRepository.save(notification),
                 NotificationResponse.class
         );
+    }
+
+    @Override
+    public void deleteNotification(
+            Integer notificationId,
+            Integer userId,
+            Integer customerId) {
+
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Notification not found with ID: " + notificationId
+                        ));
+
+        // Verify that the notification belongs to the requesting user/customer.
+        boolean belongsToUser = userId != null
+                && notification.getUserId() != null
+                && notification.getUserId().equals(userId);
+
+        boolean belongsToCustomer = customerId != null
+                && notification.getCustomerId() != null
+                && notification.getCustomerId().equals(customerId);
+
+        if (!belongsToUser && !belongsToCustomer) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "You are not allowed to delete this notification"
+            );
+        }
+
+        notificationRepository.delete(notification);
     }
 }

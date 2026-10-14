@@ -11,4 +11,6 @@ public interface NotificationService {
     List<NotificationResponse> getCustomerNotifications(Integer customerId);
 
     NotificationResponse markAsRead(Integer notificationId);
+
+    void deleteNotification(Integer notificationId, Integer userId, Integer customerId);
 }

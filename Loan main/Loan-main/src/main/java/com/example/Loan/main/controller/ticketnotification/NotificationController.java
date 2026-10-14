@@ -66,4 +66,20 @@ public class NotificationController {
             @PathVariable Integer notificationId) {
         return ResponseEntity.ok(notificationService.markAsRead(notificationId));
     }
+
+    @DeleteMapping("/{notificationId}")
+    public ResponseEntity<Void> deleteNotification(
+            @PathVariable Integer notificationId,
+            @RequestParam(required = false) Integer userId,
+            @RequestParam(required = false) Integer customerId) {
+
+        notificationService.deleteNotification(
+                notificationId,
+                userId,
+                customerId
+        );
+
+        return ResponseEntity.noContent().build();
+    }
+
 }
