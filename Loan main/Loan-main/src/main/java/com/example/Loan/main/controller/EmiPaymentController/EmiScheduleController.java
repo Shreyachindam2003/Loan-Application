@@ -87,12 +87,26 @@ public class EmiScheduleController {
         );
     }
 
+
     @PostMapping("/loan/{loanAccountId}/recalculate")
-    public ResponseEntity<List<EmiScheduleResponse>> recalculate(
+    public ResponseEntity<ApiResponse<List<EmiScheduleResponse>>> recalculate(
             @PathVariable Integer loanAccountId) {
 
+        log.info("EMI schedule recalculation started for loanAccountId: {}", loanAccountId);
+
+        List<EmiScheduleResponse> data =
+                emiScheduleService.recalculateEmiSchedule(loanAccountId);
+
+        log.info("EMI schedule recalculated successfully for loanAccountId: {}, records: {}",
+                loanAccountId, data.size());
+
         return ResponseEntity.ok(
-                emiScheduleService.recalculateEmiSchedule(
-                        loanAccountId));
+                ApiResponse.<List<EmiScheduleResponse>>builder()
+                        .success(true)
+                        .message("EMI schedule recalculated successfully")
+                        .data(data)
+                        .build()
+        );
     }
+
 }

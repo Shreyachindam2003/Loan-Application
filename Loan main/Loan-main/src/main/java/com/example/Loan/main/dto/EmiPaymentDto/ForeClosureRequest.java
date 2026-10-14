@@ -15,7 +15,7 @@ public class ForeClosureRequest {
 
     private BigDecimal partialAmount;
 
-    private Integer partialTenureMonths;
+//    private Integer partialTenureMonths;
 
     private String reason;
 }
