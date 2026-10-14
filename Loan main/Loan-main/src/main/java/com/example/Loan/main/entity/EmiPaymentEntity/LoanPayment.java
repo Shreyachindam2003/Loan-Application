@@ -60,4 +60,11 @@ public class LoanPayment {
 
     @Column(name = "PaymentDate")
     private LocalDateTime paymentDate;
+
+    @Column(name = "PaymentPurpose", length = 30)
+    private String paymentPurpose;
+
+    // Links a closure payment to its foreclosure request
+    @Column(name = "ForeclosureRequestId")
+    private Integer foreclosureRequestId;
 }

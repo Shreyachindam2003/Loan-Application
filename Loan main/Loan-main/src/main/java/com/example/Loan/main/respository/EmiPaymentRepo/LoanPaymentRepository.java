@@ -30,4 +30,9 @@ public interface LoanPaymentRepository
 
     Optional<LoanPayment> findByEmiScheduleId(
             Integer emiScheduleId);
+    // Find payment linked to a specific foreclosure request
+    Optional<LoanPayment> findByForeclosureRequestIdAndPaymentPurpose(
+            Integer foreclosureRequestId,
+            String paymentPurpose);
 }
+

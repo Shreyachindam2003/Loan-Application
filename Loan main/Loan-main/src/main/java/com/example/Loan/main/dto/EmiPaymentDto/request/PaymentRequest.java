@@ -22,4 +22,10 @@ public class PaymentRequest {
     private String razorpaySignature;
 
     private String idempotencyKey;
+
+    // EMI, PARTIAL_CLOSURE or FULL_CLOSURE
+    private String paymentPurpose;
+
+    // Required for partial/full closure payments
+    private Integer foreclosureRequestId;
 }
