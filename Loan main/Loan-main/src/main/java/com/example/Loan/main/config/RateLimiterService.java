@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class RateLimiterService {
 
-    private static final int MAX_REQUESTS = 3;
+    private static final int MAX_REQUESTS = 60;
     private static final long WINDOW_MILLIS = 60_000L;
 
     private final ConcurrentHashMap<String, ClientWindow> clients = new ConcurrentHashMap<>();
