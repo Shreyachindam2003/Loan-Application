@@ -28,15 +28,6 @@ public class ForeClosureRequest {
     @Column(name = "PartialAmount")
     private BigDecimal partialAmount;
 
-    @Column(name = "PartialTenureMonths")
-    private Integer partialTenureMonths;
-
-    @Column(name = "RevisedEmiAmount")
-    private BigDecimal revisedEmiAmount;
-
-    @Column(name = "RemainingPrincipal")
-    private BigDecimal remainingPrincipal;
-
     @Column(name = "RequestedDate")
     private LocalDateTime requestedDate;
 

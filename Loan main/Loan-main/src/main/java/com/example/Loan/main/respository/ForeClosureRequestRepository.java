@@ -1,11 +1,11 @@
+
 package com.example.Loan.main.respository;
 
 import java.util.List;
 
-import com.example.Loan.main.dto.EmiPaymentDto.ForeClosureRequest;
+import com.example.Loan.main.entity.ForeClosureRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-
 
 @Repository
 public interface ForeClosureRequestRepository
