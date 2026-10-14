@@ -5,9 +5,10 @@ import com.example.Loan.main.dto.loandealcreation.request.DisbursementRequest;
 import com.example.Loan.main.dto.loandealcreation.response.DisbursementResponse;
 import com.example.Loan.main.dto.loandealcreation.response.LoanAccountResponse;
 import com.example.Loan.main.entity.loandealcreation.*;
+
+import com.example.Loan.main.enums.LoanApplicationStatus;
 import com.example.Loan.main.exception.loandealcreation.BusinessException;
 import com.example.Loan.main.exception.loandealcreation.ResourceNotFoundException;
-
 import com.example.Loan.main.respository.loandealcreation.DisbursementRepository;
 import com.example.Loan.main.respository.loandealcreation.LoanAccountRepository;
 import com.example.Loan.main.respository.loandealcreation.LoanDealRepository;
@@ -76,9 +77,9 @@ public class DisbursementServiceImpl implements DisbursementService {
             return response(existing, account);
         }
 
-        if (!"APPROVED".equals(deal.getStatus())) {
+        if (deal.getStatus() != LoanApplicationStatus.SANCTIONED) {
             throw new BusinessException(
-                    "Only approved applications can be disbursed"
+                    "Only sanctioned applications can be disbursed"
             );
         }
 
@@ -107,7 +108,6 @@ public class DisbursementServiceImpl implements DisbursementService {
 
         repo.saveAndFlush(disbursement);
 
-        // Loan account is created only after successful disbursement.
         LoanAccount account = new LoanAccount();
 
         account.setCustomerId(deal.getCustomerId());
@@ -117,6 +117,7 @@ public class DisbursementServiceImpl implements DisbursementService {
                 "LA-%010d",
                 dealId
         ));
+
         account.setLoanAmount(sanction.getLoanAmount());
         account.setOutstandingPrincipal(sanction.getLoanAmount());
         account.setInterestRate(sanction.getInterestRate());
@@ -129,7 +130,7 @@ public class DisbursementServiceImpl implements DisbursementService {
 
         accountRepo.saveAndFlush(account);
 
-        deal.setStatus("DISBURSED");
+        deal.setStatus(LoanApplicationStatus.DISBURSED);
         dealRepo.save(deal);
 
         return response(disbursement, account);
@@ -211,7 +212,8 @@ public class DisbursementServiceImpl implements DisbursementService {
             );
         }
 
-        if (deal.getBankName() == null || deal.getBankName().isBlank()
+        if (deal.getBankName() == null
+                || deal.getBankName().isBlank()
                 || deal.getBankAccountNumber() == null
                 || deal.getBankAccountNumber().isBlank()
                 || deal.getIfscCode() == null
@@ -232,4 +234,4 @@ public class DisbursementServiceImpl implements DisbursementService {
                 DisbursementResponse.class
         );
     }
-}//dada
+}

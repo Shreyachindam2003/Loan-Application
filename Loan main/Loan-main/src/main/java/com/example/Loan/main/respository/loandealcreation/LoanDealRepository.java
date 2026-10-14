@@ -1,6 +1,7 @@
 package com.example.Loan.main.respository.loandealcreation;
 
 import com.example.Loan.main.entity.loandealcreation.LoanDeal;
+import com.example.Loan.main.enums.LoanApplicationStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -13,11 +14,13 @@ import java.util.Optional;
 public interface LoanDealRepository
         extends JpaRepository<LoanDeal, Integer> {
 
-    List<LoanDeal> findByStatusOrderByCreatedAtAsc(String status);
+    List<LoanDeal> findByStatusOrderByCreatedAtAsc(
+            LoanApplicationStatus status
+    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select d from LoanDeal d where d.dealId = :dealId")
     Optional<LoanDeal> findByIdForUpdate(
             @Param("dealId") Integer dealId
     );
-}//dada
+}

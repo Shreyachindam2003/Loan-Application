@@ -4,6 +4,7 @@ import com.example.Loan.main.dto.loandealcreation.request.LoanApplyRequest;
 import com.example.Loan.main.dto.loandealcreation.response.LoanDealResponse;
 import com.example.Loan.main.entity.loandealcreation.LoanDeal;
 import com.example.Loan.main.entity.loandealcreation.ScoreCard;
+import com.example.Loan.main.enums.LoanApplicationStatus;
 import com.example.Loan.main.enums.loandealcreation.LoanType;
 import com.example.Loan.main.exception.loandealcreation.BusinessException;
 import com.example.Loan.main.exception.loandealcreation.ResourceNotFoundException;
@@ -108,12 +109,14 @@ public class LoanDealServiceImpl implements LoanDealService {
                 card.getEligibleLoanAmount()
         );
         deal.setInterestRate(request.loanType().getAnnualRate());
+
         deal.setEmiAmount(emiCalculator.calculate(
                 request.loanAmount(),
                 deal.getInterestRate(),
                 request.tenureMonths()
         ));
-        deal.setStatus("PENDING_REVIEW");
+
+        deal.setStatus(LoanApplicationStatus.PENDING_REVIEW);
         deal.setCreatedAt(LocalDateTime.now());
 
         return modelMapper.map(
@@ -136,7 +139,9 @@ public class LoanDealServiceImpl implements LoanDealService {
     @Override
     @Transactional(readOnly = true)
     public List<LoanDealResponse> getPendingDeals() {
-        return repo.findByStatusOrderByCreatedAtAsc("PENDING_REVIEW")
+        return repo.findByStatusOrderByCreatedAtAsc(
+                        LoanApplicationStatus.PENDING_REVIEW
+                )
                 .stream()
                 .map(deal -> modelMapper.map(
                         deal,
@@ -144,4 +149,4 @@ public class LoanDealServiceImpl implements LoanDealService {
                 ))
                 .toList();
     }
-}//dada
+}

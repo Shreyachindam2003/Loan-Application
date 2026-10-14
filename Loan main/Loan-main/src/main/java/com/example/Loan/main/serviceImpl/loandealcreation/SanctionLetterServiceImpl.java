@@ -3,6 +3,8 @@ package com.example.Loan.main.serviceImpl.loandealcreation;
 import com.example.Loan.main.dto.loandealcreation.response.SanctionLetterResponse;
 import com.example.Loan.main.entity.loandealcreation.LoanDeal;
 import com.example.Loan.main.entity.loandealcreation.SanctionLetter;
+
+import com.example.Loan.main.enums.LoanApplicationStatus;
 import com.example.Loan.main.enums.loandealcreation.LoanType;
 import com.example.Loan.main.exception.loandealcreation.BusinessException;
 import com.example.Loan.main.exception.loandealcreation.ResourceNotFoundException;
@@ -69,13 +71,18 @@ public class SanctionLetterServiceImpl
                 .orElse(null);
 
         if (existing != null) {
+            if (deal.getStatus() == LoanApplicationStatus.APPROVED) {
+                deal.setStatus(LoanApplicationStatus.SANCTIONED);
+                dealRepo.save(deal);
+            }
+
             return modelMapper.map(
                     existing,
                     SanctionLetterResponse.class
             );
         }
 
-        if (!"APPROVED".equals(deal.getStatus())) {
+        if (deal.getStatus() != LoanApplicationStatus.APPROVED) {
             throw new BusinessException(
                     "Sanction letter requires an approved application"
             );
@@ -127,7 +134,9 @@ public class SanctionLetterServiceImpl
         );
 
         if (applicants.isEmpty()) {
-            throw new ResourceNotFoundException("Customer not found");
+            throw new ResourceNotFoundException(
+                    "Customer not found"
+            );
         }
 
         Applicant applicant = applicants.get(0);
@@ -153,6 +162,7 @@ public class SanctionLetterServiceImpl
         letter.setLoanType(deal.getLoanType().name());
         letter.setPropertyAddress(deal.getPropertyAddress());
         letter.setProcessingChargePercent(processingPercent);
+
         letter.setProcessingChargeAmount(
                 deal.getApprovedAmount()
                         .multiply(processingPercent)
@@ -162,6 +172,7 @@ public class SanctionLetterServiceImpl
                                 RoundingMode.HALF_UP
                         )
         );
+
         letter.setOriginationFee(
                 originationFee.setScale(2, RoundingMode.HALF_UP)
         );
@@ -170,8 +181,13 @@ public class SanctionLetterServiceImpl
         letter.setAdditionalConditions(conditions);
         letter.setAuthorizedSignatory(signatory);
 
+        SanctionLetter savedLetter = repo.save(letter);
+
+        deal.setStatus(LoanApplicationStatus.SANCTIONED);
+        dealRepo.save(deal);
+
         return modelMapper.map(
-                repo.save(letter),
+                savedLetter,
                 SanctionLetterResponse.class
         );
     }
@@ -188,7 +204,10 @@ public class SanctionLetterServiceImpl
     @Override
     @Transactional(readOnly = true)
     public byte[] downloadPdf(Integer sanctionId) {
-        SanctionLetterResponse letter = getById(sanctionId);
+        SanctionLetterResponse letter = modelMapper.map(
+                findLetter(sanctionId),
+                SanctionLetterResponse.class
+        );
 
         List<String> lines = new ArrayList<>();
 
@@ -198,15 +217,23 @@ public class SanctionLetterServiceImpl
         lines.add("Applicant: " + value(letter.applicantName()));
         lines.add("Mobile: " + value(letter.mobileNo()));
         lines.add("Loan Type: " + value(letter.loanType()));
-        lines.add("Sanctioned Amount: INR " + value(letter.sanctionedAmount()));
-        lines.add("Annual Interest: " + value(letter.annualInterestRate()) + "%");
-        lines.add("Tenure: " + value(letter.tenureMonths()) + " months");
-        lines.add("Monthly EMI: INR " + value(letter.emiAmount()));
-        lines.add("Processing Charge: " + value(letter.processingChargePercent()) + "%");
-        lines.add("Processing Amount: INR " + value(letter.processingChargeAmount()));
-        lines.add("Origination Fee: INR " + value(letter.originationFee()));
+        lines.add("Sanctioned Amount: INR "
+                + value(letter.sanctionedAmount()));
+        lines.add("Annual Interest: "
+                + value(letter.annualInterestRate()) + "%");
+        lines.add("Tenure: "
+                + value(letter.tenureMonths()) + " months");
+        lines.add("Monthly EMI: INR "
+                + value(letter.emiAmount()));
+        lines.add("Processing Charge: "
+                + value(letter.processingChargePercent()) + "%");
+        lines.add("Processing Amount: INR "
+                + value(letter.processingChargeAmount()));
+        lines.add("Origination Fee: INR "
+                + value(letter.originationFee()));
         lines.add("Issued At: " + value(letter.issuedAt()));
-        lines.add("Validity: " + value(letter.validityDays()) + " days");
+        lines.add("Validity: "
+                + value(letter.validityDays()) + " days");
         lines.add("Valid Until: " + value(letter.validUntil()));
         lines.add("Property Address: " + value(letter.propertyAddress()));
         lines.add("Issuing Bank: " + value(letter.issuingBank()));
@@ -303,4 +330,4 @@ public class SanctionLetterServiceImpl
             String mobileNo
     ) {
     }
-}//dada
+}

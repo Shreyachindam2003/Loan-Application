@@ -3,9 +3,9 @@ package com.example.Loan.main.serviceImpl.loandealcreation;
 import com.example.Loan.main.dto.loandealcreation.request.DealDecisionRequest;
 import com.example.Loan.main.dto.loandealcreation.response.LoanDealResponse;
 import com.example.Loan.main.entity.loandealcreation.LoanDeal;
+import com.example.Loan.main.enums.LoanApplicationStatus;
 import com.example.Loan.main.exception.loandealcreation.BusinessException;
 import com.example.Loan.main.exception.loandealcreation.ResourceNotFoundException;
-
 import com.example.Loan.main.respository.loandealcreation.LoanDealRepository;
 import com.example.Loan.main.service.loandealcreation.DealReviewService;
 import lombok.RequiredArgsConstructor;
@@ -51,7 +51,7 @@ public class DealReviewServiceImpl implements DealReviewService {
                         "Loan application not found"
                 ));
 
-        if (!"PENDING_REVIEW".equals(deal.getStatus())) {
+        if (deal.getStatus() != LoanApplicationStatus.PENDING_REVIEW) {
             throw new BusinessException(
                     "Only pending applications can be reviewed"
             );
@@ -80,10 +80,14 @@ public class DealReviewServiceImpl implements DealReviewService {
                 || emails.get(0) == null
                 || emails.get(0).isBlank()) {
 
-            throw new BusinessException("Customer email is missing");
+            throw new BusinessException(
+                    "Customer email is missing"
+            );
         }
 
-        String status = request.decision().name();
+        LoanApplicationStatus status = approved
+                ? LoanApplicationStatus.APPROVED
+                : LoanApplicationStatus.REJECTED;
 
         deal.setStatus(status);
         deal.setApprovedAmount(
@@ -99,7 +103,7 @@ public class DealReviewServiceImpl implements DealReviewService {
                 """,
                 dealId,
                 officerId,
-                status,
+                status.name(),
                 remarks,
                 LocalDateTime.now()
         );
@@ -158,4 +162,4 @@ public class DealReviewServiceImpl implements DealReviewService {
 
         return modelMapper.map(deal, LoanDealResponse.class);
     }
-}//dada
+}

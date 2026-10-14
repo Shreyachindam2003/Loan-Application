@@ -1,5 +1,6 @@
 package com.example.Loan.main.entity.loandealcreation;
 
+import com.example.Loan.main.enums.LoanApplicationStatus;
 import com.example.Loan.main.enums.loandealcreation.LoanType;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -16,7 +17,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 public class LoanDeal {
-    //dada
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "DealId")
@@ -32,11 +33,7 @@ public class LoanDeal {
     @Column(name = "LoanType")
     private LoanType loanType;
 
-    @Column(
-            name = "LoanAmount",
-            precision = 18,
-            scale = 2
-    )
+    @Column(name = "LoanAmount", precision = 18, scale = 2)
     private BigDecimal loanAmount;
 
     @Column(
@@ -46,21 +43,13 @@ public class LoanDeal {
     )
     private BigDecimal eligibleAmountAtApplication;
 
-    @Column(
-            name = "InterestRate",
-            precision = 8,
-            scale = 4
-    )
+    @Column(name = "InterestRate", precision = 8, scale = 4)
     private BigDecimal interestRate;
 
     @Column(name = "TenureMonths")
     private Integer tenureMonths;
 
-    @Column(
-            name = "EmiAmount",
-            precision = 18,
-            scale = 2
-    )
+    @Column(name = "EmiAmount", precision = 18, scale = 2)
     private BigDecimal emiAmount;
 
     @Column(name = "BankName", length = 200)
@@ -75,11 +64,7 @@ public class LoanDeal {
     @Column(name = "EmiDay")
     private Integer emiDay;
 
-    @Column(
-            name = "ApprovedAmount",
-            precision = 18,
-            scale = 2
-    )
+    @Column(name = "ApprovedAmount", precision = 18, scale = 2)
     private BigDecimal approvedAmount;
 
     @Column(name = "RequestedDisbursementDate")
@@ -88,8 +73,9 @@ public class LoanDeal {
     @Column(name = "PropertyAddress", length = 1000)
     private String propertyAddress;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "Status")
-    private String status;
+    private LoanApplicationStatus status;
 
     @Column(name = "CreatedAt")
     private LocalDateTime createdAt;
