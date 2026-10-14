@@ -11,12 +11,14 @@
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
         </processorPath>
         <module name="Loan-main" />
+        <module name="loan-auth-module" />
       </profile>
     </annotationProcessing>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="Loan-main" options="-parameters" />
+      <module name="loan-auth-module" options="-parameters" />
     </option>
   </component>
 </project>

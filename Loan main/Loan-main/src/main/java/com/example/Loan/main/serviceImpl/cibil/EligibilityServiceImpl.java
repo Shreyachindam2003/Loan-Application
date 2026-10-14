@@ -172,7 +172,8 @@ public class EligibilityServiceImpl implements EligibilityService {
     private CibilEligibiltyResponse createResponse(EligibilityResults results){
 
         CibilEligibiltyResponse response=modelMapper.map(results, CibilEligibiltyResponse.class);
-       Customer customer=results.getCustomer();
+        response.setEligibilityId(results.getEligibilityId());
+        Customer customer=results.getCustomer();
        response.setFullName(customer.getFirstName()+ " "+customer.getLastName());
       response.setPanNo(maskPan(customer.getPanNo()));
       response.setMonthlyIncome(customer.getMonthlyIncome());

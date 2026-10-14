@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 @Data
 @RequiredArgsConstructor
 public class CibilEligibiltyResponse{
-
+    private Long eligibilityId;
     private BigDecimal loanAmount;
     private String FullName;
     private String panNo;
