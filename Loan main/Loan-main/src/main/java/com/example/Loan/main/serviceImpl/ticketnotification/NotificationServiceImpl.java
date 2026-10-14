@@ -2,6 +2,7 @@ package com.example.Loan.main.serviceImpl.ticketnotification;
 
 import com.example.Loan.main.dto.ticketnotification.NotificationResponse;
 import com.example.Loan.main.entity.ticketnotification.Notification;
+import com.example.Loan.main.exception.ResourceNotFoundException;
 import com.example.Loan.main.respository.ticketnotification.NotificationRepository;
 import com.example.Loan.main.service.ticketnotification.NotificationService;
 import org.modelmapper.ModelMapper;
@@ -41,7 +42,10 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public NotificationResponse markAsRead(Integer notificationId) {
         Notification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("Notification not found"));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Notification not found with ID: " + notificationId
+                        ));
 
         notification.setIsRead(true);
         return modelMapper.map(

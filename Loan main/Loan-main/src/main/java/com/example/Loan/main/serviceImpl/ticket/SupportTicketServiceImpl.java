@@ -6,6 +6,7 @@ import com.example.Loan.main.entity.ticket.TicketResponse;
 import com.example.Loan.main.entity.ticketnotification.Notification;
 import com.example.Loan.main.enums.ticket.TicketStatus;
 import com.example.Loan.main.enums.ticketnotification.NotificationType;
+import com.example.Loan.main.exception.ResourceNotFoundException;
 import com.example.Loan.main.respository.ticket.SupportTicketRepository;
 import com.example.Loan.main.respository.ticket.TicketResponseRepository;
 import com.example.Loan.main.respository.ticketnotification.NotificationRepository;
@@ -204,7 +205,7 @@ public class SupportTicketServiceImpl implements SupportTicketService {
 
     private SupportTicket getTicket(Integer ticketId) {
         return supportTicketRepository.findById(ticketId)
-                .orElseThrow(() -> new RuntimeException("Support ticket not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Support ticket not found with ID: " + ticketId));
     }
 
     private SupportTicketResponse toResponse(SupportTicket ticket) {
