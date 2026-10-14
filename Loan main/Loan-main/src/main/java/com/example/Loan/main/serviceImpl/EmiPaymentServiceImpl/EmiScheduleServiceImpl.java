@@ -348,6 +348,7 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
         return outstanding.setScale(2, RoundingMode.HALF_UP);
     }
 
+
     private void createSchedule(
             Integer loanId,
             BigDecimal principalAmount,
@@ -357,66 +358,48 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
             int emiDay,
             LocalDate disbursementDate) {
 
-        BigDecimal monthlyRate = rate(annualInterestRate);
+        BigDecimal fixedInterest = principalAmount
+                .multiply(rate(annualInterestRate))
+                .setScale(2, RoundingMode.HALF_UP);
+
         BigDecimal balance = principalAmount;
+        YearMonth month = YearMonth.from(firstEmiDate(disbursementDate, emiDay));
 
-        LocalDate firstDate = firstEmiDate(disbursementDate, emiDay);
-        YearMonth month = YearMonth.from(firstDate);
-
-        for (int i = 1; i <= tenure; i++) {
-
+        for (int i = 1; i <= tenure && balance.compareTo(BigDecimal.ZERO) > 0; i++) {
             LocalDate dueDate = getEmiDate(month, emiDay);
-            BigDecimal openingBalance = balance;
-
-            BigDecimal interest = balance.multiply(monthlyRate)
+            BigDecimal principal = regularEmi.subtract(fixedInterest)
                     .setScale(2, RoundingMode.HALF_UP);
 
-            BigDecimal principal = regularEmi.subtract(interest)
-                    .setScale(2, RoundingMode.HALF_UP);
-
-            BigDecimal currentEmi = regularEmi;
-
-            BigDecimal closingBalance = balance.subtract(principal)
-                    .setScale(2, RoundingMode.HALF_UP);
-
-            if (i == tenure || closingBalance.compareTo(BigDecimal.ZERO) < 0) {
-
-                principal = balance;
-                currentEmi = principal.add(interest)
-                        .setScale(2, RoundingMode.HALF_UP);
-                closingBalance = BigDecimal.ZERO;
-
-            } else if (principal.compareTo(BigDecimal.ZERO) <= 0) {
-
+            if (principal.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new InvalidLoanDataException(
-                        "Configured EMI is not sufficient to reduce loan principal");
+                        "EMI must be greater than fixed monthly interest");
             }
+
+            principal = principal.min(balance);
+            BigDecimal currentEmi = principal.add(fixedInterest)
+                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal closingBalance = balance.subtract(principal);
 
             EmiSchedule emi = new EmiSchedule();
             emi.setLoanAccountId(loanId);
             emi.setInstallmentNo(i);
             emi.setDueDate(dueDate);
-            emi.setOpeningBalance(openingBalance);
+            emi.setOpeningBalance(balance);
             emi.setEmiAmount(currentEmi);
             emi.setPrincipalAmount(principal);
-            emi.setInterestAmount(interest);
+            emi.setInterestAmount(fixedInterest);
             emi.setClosingBalance(closingBalance);
             emi.setStatus(EmiStatus.PENDING);
 
             emiRepo.save(emi);
 
             balance = closingBalance;
-
-            if (balance.compareTo(BigDecimal.ZERO) == 0) {
-                break;
-            }
-
             month = month.plusMonths(1);
         }
 
-        log.info("Created EMI installments for Loan Account ID: {}",
-                loanId);
+        log.info("Created fixed-interest EMI schedule for loanId: {}", loanId);
     }
+
 
 
     private void recalculate(
@@ -433,19 +416,22 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
                         && e.getDueDate().isAfter(today))
                 .toList();
 
-        if (future.isEmpty()) {
-            log.warn("No future pending EMIs available for recalculation");
-            return;
-        }
+        BigDecimal originalPrincipal = list.stream()
+                .filter(e -> e.getInstallmentNo() == 1)
+                .map(EmiSchedule::getOpeningBalance)
+                .findFirst()
+                .orElseThrow(() -> new InvalidLoanDataException(
+                        "Original principal not found"));
 
-        BigDecimal monthlyRate = rate(annualInterestRate);
+        BigDecimal fixedInterest = originalPrincipal
+                .multiply(rate(annualInterestRate))
+                .setScale(2, RoundingMode.HALF_UP);
+
         BigDecimal balance = outstanding;
-        boolean loanCompleted = false;
 
         for (EmiSchedule emi : future) {
 
-            // Loan already closed: reset remaining future installments
-            if (loanCompleted || balance.compareTo(BigDecimal.ZERO) <= 0) {
+            if (balance.compareTo(BigDecimal.ZERO) <= 0) {
                 emi.setOpeningBalance(BigDecimal.ZERO);
                 emi.setInterestAmount(BigDecimal.ZERO);
                 emi.setPrincipalAmount(BigDecimal.ZERO);
@@ -455,45 +441,22 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
                 continue;
             }
 
-            BigDecimal openingBalance = balance;
-
-            BigDecimal interest = openingBalance
-                    .multiply(monthlyRate)
-                    .setScale(2, RoundingMode.HALF_UP);
-
-            BigDecimal principal = regularEmi.subtract(interest)
+            BigDecimal principal = regularEmi.subtract(fixedInterest)
                     .setScale(2, RoundingMode.HALF_UP);
 
             if (principal.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new InvalidLoanDataException(
-                        "Configured EMI is not sufficient to reduce outstanding principal");
+                        "EMI must be greater than fixed monthly interest");
             }
 
-            BigDecimal currentEmi;
-            BigDecimal closingBalance;
+            principal = principal.min(balance);
+            BigDecimal currentEmi = principal.add(fixedInterest)
+                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal closingBalance = balance.subtract(principal);
 
-            // Final EMI: collect only the remaining principal plus interest
-            if (principal.compareTo(openingBalance) >= 0) {
-
-                principal = openingBalance;
-
-                currentEmi = principal.add(interest)
-                        .setScale(2, RoundingMode.HALF_UP);
-
-                closingBalance = BigDecimal.ZERO;
-                loanCompleted = true;
-
-            } else {
-
-                currentEmi = regularEmi;
-
-                closingBalance = openingBalance.subtract(principal)
-                        .setScale(2, RoundingMode.HALF_UP);
-            }
-
-            emi.setOpeningBalance(openingBalance);
-            emi.setInterestAmount(interest);
+            emi.setOpeningBalance(balance);
             emi.setPrincipalAmount(principal);
+            emi.setInterestAmount(fixedInterest);
             emi.setEmiAmount(currentEmi);
             emi.setClosingBalance(closingBalance);
 
@@ -502,9 +465,8 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
 
         emiRepo.saveAll(future);
 
-        log.info(
-                "EMI recalculation completed. Outstanding: {}, Final balance: {}, Loan completed: {}",
-                outstanding, balance, loanCompleted);
+        log.info("Fixed-interest recalculation completed. Outstanding: {}, Remaining: {}",
+                outstanding, balance);
     }
 
 
