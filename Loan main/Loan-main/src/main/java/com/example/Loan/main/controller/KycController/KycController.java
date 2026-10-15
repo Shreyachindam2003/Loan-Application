@@ -21,10 +21,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/kyc")
 @RequiredArgsConstructor
+@CrossOrigin("http://localhost:4200/")
+
 public class KycController {
 
     private final KycService kycService;
-
 
 
     @PostMapping(
@@ -111,20 +112,12 @@ public class KycController {
             @PathVariable Long documentId
     ) {
 
-        kycService.deleteCustomerDocument(
-                userId,
-                documentId
+        kycService.deleteCustomerDocument(userId, documentId
         );
 
         return ResponseEntity.ok(
-                new ApiResponse<>(
-                        true,
-                        "Document deleted successfully",
-                        null
-                )
-        );
+                new ApiResponse<>(true, "Document deleted successfully", null));
     }
-
 
 
     @GetMapping("/officer/pending")

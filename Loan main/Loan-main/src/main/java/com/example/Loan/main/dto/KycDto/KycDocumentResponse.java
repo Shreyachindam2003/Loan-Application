@@ -14,6 +14,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class KycDocumentResponse {
 
+    private String customerName;
+    private String email;
+    private String mobile;
     private Long documentId;
     private Long customerId;
     private String documentType;

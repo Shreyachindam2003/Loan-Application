@@ -28,9 +28,12 @@ public class EligibilityServiceImpl implements EligibilityService {
     private final EligibilityRepository eligibilityRepository;
     private final ModelMapper modelMapper;
 
+
     @Override
     public CibilEligibiltyResponse checkEligibility(Customer customer) {
+
         log.info("Eligibility check started for customer");
+
         CibilReports cibilReports = cibilRepository.findByCustomer(customer)
                 .orElseThrow(() -> {
                     log.warn("CIBIL report not found for customer");
@@ -43,37 +46,52 @@ public class EligibilityServiceImpl implements EligibilityService {
         EligibilityResults results = eligibilityRepository.findByCustomer(customer)
                 .orElse(new EligibilityResults());
 
+        boolean isNew = results.getEligibilityId() == null;
+
         results.setCustomer(customer);
         results.setCibilScore(Score);
+
         BigDecimal eligibleLoanAmount = getEligibleLoanAmount(Score);
         results.setLoanAmount(eligibleLoanAmount);
+
         log.info("Eligible loan amount calculated: {}", eligibleLoanAmount);
 
-        if (Score >= 800) {
-            results.setStatus("APPROVED");
-            results.setIsEligible(true);
-            results.setRejectionReason(null);
-            log.info("Eligibility status: APPROVED");
+        if (isNew || "PENDING".equalsIgnoreCase(results.getStatus())) {
 
-        } else if (Score >= 600) {
-            results.setStatus("PENDING");
-            results.setIsEligible(null);
-            results.setRejectionReason(null);
-            log.info("Eligibility status: PENDING");
+            if (Score >= 800) {
+                results.setStatus("APPROVED");
+                results.setIsEligible(true);
+                results.setRejectionReason(null);
 
+                log.info("Eligibility status: APPROVED");
 
+            } else if (Score >= 600) {
+                results.setStatus("PENDING");
+                results.setIsEligible(null);
+                results.setRejectionReason(null);
+
+                log.info("Eligibility status: PENDING");
+
+            } else {
+                results.setStatus("REJECTED");
+                results.setIsEligible(false);
+                results.setRejectionReason("CIBIL score is below 650");
+
+                log.info("Eligibility status: REJECTED");
+            }
         } else {
-            results.setStatus("REJECTED");
-            results.setIsEligible(false);
-            results.setRejectionReason("CIBIL score is below 650");
-            log.info("Eligibility status: REJECTED");
-
+            log.info("Keeping existing officer-reviewed status: {}",
+                    results.getStatus());
         }
 
-       eligibilityRepository.save(results);
-        log.info("Eligibility result saved successfully with status: {}", results.getStatus());
+        eligibilityRepository.save(results);
+
+        log.info("Eligibility result saved successfully with status: {}",
+                results.getStatus());
+
         return createResponse(results);
     }
+
 
     @Override
     public CibilEligibiltyResponse approvedEligibility(Long eligibilityId) {

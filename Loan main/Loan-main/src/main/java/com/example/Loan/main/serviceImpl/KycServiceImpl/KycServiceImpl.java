@@ -40,8 +40,6 @@ public class KycServiceImpl implements KycService {
     private final ModelMapper modelMapper;
     private final KycDocumentRepository kycDocumentRepository;
     private final customerRepository customerRepository;
-    //  private final NotificationService notificationService;
-    // private final EmailService emailService;
     private void validateFile(MultipartFile file) {
 
         if (file == null || file.isEmpty()) {
@@ -109,17 +107,29 @@ public class KycServiceImpl implements KycService {
 //                savedDocument.getDocumentId()
 //        );
 
-        log.info(
-                "KYC upload notification sent, officerId={}, documentId={}",
-                //    officer.getUserId(),
-                savedDocument.getDocumentId()
+        log.info("KYC upload notification sent, officerId={}, documentId={}",
+                savedDocument.getDocumentId());
+
+
+        KycDocumentResponse response = new KycDocumentResponse();
+
+        Customer savedCustomer = savedDocument.getCustomer();
+
+        response.setDocumentId(savedDocument.getDocumentId());
+        response.setCustomerId(savedCustomer.getCustomerId());
+        response.setDocumentType(savedDocument.getDocumentType());
+        response.setFilePath(savedDocument.getFilePath());
+        response.setVerificationStatus(savedDocument.getVerificationStatus());
+
+        response.setCustomerName(
+                savedCustomer.getFirstName() + " " + savedCustomer.getLastName()
         );
-
-        KycDocumentResponse response = modelMapper.map(savedDocument, KycDocumentResponse.class);
-
-        response.setCustomerId(savedDocument.getCustomer().getCustomerId());
+        response.setEmail(savedCustomer.getEmail());
+        response.setMobile(savedCustomer.getMobileNo());
 
         return response;
+
+
     }
 
 
@@ -132,9 +142,35 @@ public class KycServiceImpl implements KycService {
         return documents.stream()
                 .map(document -> {
 
-                    KycDocumentResponse response = modelMapper.map(document, KycDocumentResponse.class);
+                    KycDocumentResponse response = new KycDocumentResponse();
 
-                    response.setCustomerId(document.getCustomer().getCustomerId());
+                    response.setDocumentId(document.getDocumentId());
+
+                    response.setCustomerId(
+                            document.getCustomer().getCustomerId()
+                    );
+
+                    response.setCustomerName(
+                            document.getCustomer().getFirstName() + " " +
+                                    document.getCustomer().getLastName()
+                    );
+
+                    response.setEmail(
+                            document.getCustomer().getEmail()
+                    );
+
+                    response.setMobile(
+                            document.getCustomer().getMobileNo()
+                    );
+
+                    response.setDocumentType(document.getDocumentType());
+
+                    response.setFilePath(document.getFilePath());
+
+                    response.setVerificationStatus(
+                            document.getVerificationStatus()
+                    );
+
                     return response;
                 })
                 .collect(Collectors.toList());
@@ -255,7 +291,6 @@ public class KycServiceImpl implements KycService {
             throw new KycFileException("Unable to load document", e);
         }
     }
-
     @Override
     public List<KycDocumentResponse> getDocumentsForReview() {
 
@@ -268,14 +303,24 @@ public class KycServiceImpl implements KycService {
                 .map(document -> {
 
                     KycDocumentResponse response =
-                            modelMapper.map(
-                                    document,
-                                    KycDocumentResponse.class
-                            );
+                            new KycDocumentResponse();
 
-                    response.setCustomerId(
-                            document.getCustomer().getCustomerId()
+                    Customer customer = document.getCustomer();
+
+                    response.setDocumentId(document.getDocumentId());
+                    response.setCustomerId(customer.getCustomerId());
+                    response.setDocumentType(document.getDocumentType());
+                    response.setFilePath(document.getFilePath());
+                    response.setVerificationStatus(
+                            document.getVerificationStatus()
                     );
+
+                    response.setCustomerName(
+                            customer.getFirstName() + " "
+                                    + customer.getLastName()
+                    );
+                    response.setEmail(customer.getEmail());
+                    response.setMobile(customer.getMobileNo());
 
                     return response;
                 })
@@ -429,16 +474,23 @@ public class KycServiceImpl implements KycService {
 //        }
 
 
-        KycDocumentResponse response =
-                modelMapper.map(
-                        updatedDocument,
-                        KycDocumentResponse.class
-                );
+        KycDocumentResponse response = new KycDocumentResponse();
 
-        response.setCustomerId(
-                updatedDocument.getCustomer().getCustomerId()
+        Customer customer = updatedDocument.getCustomer();
+
+        response.setDocumentId(updatedDocument.getDocumentId());
+        response.setCustomerId(customer.getCustomerId());
+        response.setDocumentType(updatedDocument.getDocumentType());
+        response.setFilePath(updatedDocument.getFilePath());
+        response.setVerificationStatus(updatedDocument.getVerificationStatus());
+
+        response.setCustomerName(
+                customer.getFirstName() + " " + customer.getLastName()
         );
+        response.setEmail(customer.getEmail());
+        response.setMobile(customer.getMobileNo());
 
         return response;
+
     }
 }
