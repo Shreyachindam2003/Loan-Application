@@ -13,9 +13,11 @@ import com.example.Loan.main.respository.ticketnotification.NotificationReposito
 import com.example.Loan.main.service.ticket.SupportTicketService;
 import com.example.Loan.main.util.ticket.FileStorageUtil;
 import org.modelmapper.ModelMapper;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -121,6 +123,31 @@ public class SupportTicketServiceImpl implements SupportTicketService {
         SupportTicket ticket = getTicket(ticketId);
         return toResponse(ticket);
     }
+
+
+
+    @Override
+    @Transactional
+    public void deleteCustomerTicket(Integer ticketId, Integer customerId) {
+
+        SupportTicket ticket = getTicket(ticketId);
+
+        // Verify ticket ownership
+        if (!customerId.equals(ticket.getCustomerId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You are not allowed to delete this ticket"
+            );
+        }
+
+        // Delete responses first
+        ticketResponseRepository.deleteByTicketId(ticketId);
+
+        // Delete the ticket
+        supportTicketRepository.delete(ticket);
+    }
+
+
 
     @Override
     public List<SupportTicketResponse> getTicketsByCustomer(Integer customerId) {

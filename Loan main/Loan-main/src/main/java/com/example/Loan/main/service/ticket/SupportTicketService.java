@@ -26,4 +26,8 @@ public interface SupportTicketService {
             Integer ticketId,
             TicketResponseMultipartRequest request
     );
+
+
+    void deleteCustomerTicket(Integer ticketId, Integer customerId);
+
 }
