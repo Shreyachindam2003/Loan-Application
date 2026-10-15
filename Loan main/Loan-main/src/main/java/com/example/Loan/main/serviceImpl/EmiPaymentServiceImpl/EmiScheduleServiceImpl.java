@@ -71,7 +71,7 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
         return mapper.map(emi, EmiScheduleResponse.class);
     }
 
-    @Override
+    /*@Override
     @Transactional
     public List<EmiScheduleResponse> generateEmiSchedule(Integer loanId) {
 
@@ -185,7 +185,118 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
 
         return toResponse(
                 emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId));
+    }*/
+
+
+    @Override
+    @Transactional
+    public List<EmiScheduleResponse> generateEmiSchedule(Integer loanId) {
+
+        LoanAccount account = accountRepo.findById(loanId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Loan account not found: " + loanId));
+
+        LoanDeal deal = dealRepo.findById(account.getDealId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Loan deal not found: " + account.getDealId()));
+
+        Disbursement disbursement = disbursementRepo
+                .findByDealId(account.getDealId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Disbursement not found for Deal ID: " + account.getDealId()));
+
+        List<EmiSchedule> list =
+                emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId);
+
+        // Existing schedule ko dobara generate mat karo
+        if (list.isEmpty()) {
+
+            BigDecimal principal = disbursement.getDisburseAmount();
+            BigDecimal emi = deal.getEmiAmount();
+            BigDecimal annualRate = deal.getInterestRate();
+
+            if (principal == null || emi == null || annualRate == null
+                    || deal.getTenureMonths() == null
+                    || deal.getEmiDay() == null
+                    || disbursement.getDisbursementDate() == null) {
+                throw new InvalidLoanDataException(
+                        "Loan or disbursement details are incomplete");
+            }
+
+            if (principal.signum() <= 0 || emi.signum() <= 0
+                    || annualRate.signum() < 0
+                    || deal.getTenureMonths() <= 0
+                    || deal.getEmiDay() < 1 || deal.getEmiDay() > 31) {
+                throw new InvalidLoanDataException(
+                        "Invalid loan details for EMI generation");
+            }
+
+            createSchedule(
+                    loanId,
+                    principal,
+                    emi,
+                    annualRate,
+                    deal.getTenureMonths(),
+                    deal.getEmiDay(),
+                    disbursement.getDisbursementDate().toLocalDate());
+
+            list = emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId);
+        }
+
+        // Existing closure processing ko preserve karo
+        LoanClosure closure = closureRepo
+                .findFirstByLoanAccountIdAndClosureStatusAndIsProcessedFalseOrderByClosureDateAsc(
+                        loanId, "COMPLETED")
+                .orElse(null);
+
+        if (closure == null) {
+            return toResponse(list);
+        }
+
+        BigDecimal originalPrincipal = disbursement.getDisburseAmount();
+
+        if ("FULL".equalsIgnoreCase(closure.getClosureType())) {
+
+            list.stream()
+                    .filter(e -> e.getStatus() == EmiStatus.PENDING)
+                    .forEach(e -> e.setStatus(EmiStatus.CLOSED));
+
+            account.setOutstandingPrincipal(money(ZERO));
+
+        } else if ("PARTIAL".equalsIgnoreCase(closure.getClosureType())) {
+
+            BigDecimal outstanding = calculateOutstanding(
+                    loanId, list, originalPrincipal);
+
+            if (outstanding.compareTo(ZERO) <= 0) {
+                list.stream()
+                        .filter(e -> e.getStatus() == EmiStatus.PENDING)
+                        .forEach(e -> e.setStatus(EmiStatus.CLOSED));
+
+                outstanding = money(ZERO);
+            } else {
+                recalculate(
+                        list, outstanding,
+                        deal.getInterestRate(), deal.getEmiAmount());
+            }
+
+            account.setOutstandingPrincipal(outstanding);
+
+        } else {
+            throw new LoanClosureException(
+                    "Unsupported closure type: " + closure.getClosureType());
+        }
+
+        emiRepo.saveAll(list);
+        accountRepo.save(account);
+
+        closure.setIsProcessed(true);
+        closureRepo.save(closure);
+
+        return toResponse(
+                emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId));
     }
+
 
     @Override
     @Transactional
@@ -299,7 +410,7 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
         return outstanding;
     }
 
-    private void createSchedule(
+    /*private void createSchedule(
             Integer loanId,
             BigDecimal principalAmount,
             BigDecimal regularEmi,
@@ -359,7 +470,64 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
         }
 
         log.info("Reducing-balance EMI schedule created for loanId: {}", loanId);
+    }*/
+
+
+    private void createSchedule(
+            Integer loanId,
+            BigDecimal principalAmount,
+            BigDecimal regularEmi,
+            BigDecimal annualInterestRate,
+            int tenure,
+            int emiDay,
+            LocalDate disbursementDate) {
+
+        BigDecimal monthlyRate = rate(annualInterestRate);
+        BigDecimal balance = money(principalAmount);
+
+        YearMonth month = YearMonth.from(
+                firstEmiDate(disbursementDate, emiDay));
+
+        for (int i = 1; i <= tenure && balance.signum() > 0; i++) {
+
+            LocalDate dueDate = getEmiDate(month, emiDay);
+
+            BigDecimal interest = money(balance.multiply(monthlyRate));
+            BigDecimal principal = money(regularEmi.subtract(interest));
+
+            if (principal.signum() <= 0) {
+                throw new InvalidLoanDataException(
+                        "EMI must be greater than monthly interest");
+            }
+
+            // Last installment mein remaining principal clear karo
+            if (i == tenure || principal.compareTo(balance) > 0) {
+                principal = balance;
+            }
+
+            BigDecimal currentEmi = money(principal.add(interest));
+            BigDecimal closingBalance = money(balance.subtract(principal));
+
+            EmiSchedule schedule = new EmiSchedule();
+            schedule.setLoanAccountId(loanId);
+            schedule.setInstallmentNo(i);
+            schedule.setDueDate(dueDate);
+            schedule.setOpeningBalance(balance);
+            schedule.setInterestAmount(interest);
+            schedule.setPrincipalAmount(principal);
+            schedule.setEmiAmount(currentEmi);
+            schedule.setClosingBalance(closingBalance);
+            schedule.setStatus(EmiStatus.PENDING);
+
+            emiRepo.save(schedule);
+
+            balance = closingBalance;
+            month = month.plusMonths(1);
+        }
+
+        log.info("EMI schedule generated for loanId: {}", loanId);
     }
+
 
     private void recalculate(
             List<EmiSchedule> list,
