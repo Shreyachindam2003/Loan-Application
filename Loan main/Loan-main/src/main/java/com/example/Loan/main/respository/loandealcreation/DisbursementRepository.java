@@ -9,4 +9,5 @@ public interface DisbursementRepository
         extends JpaRepository<Disbursement, Integer> {
 
     Optional<Disbursement> findByDealId(Integer dealId);
+
 }//dada

@@ -10,8 +10,8 @@ import com.example.Loan.main.enums.EmiPaymentEnums.EmiStatus;
 import com.example.Loan.main.exception.EmiReminderException;
 import com.example.Loan.main.respository.CustomerRepository;
 import com.example.Loan.main.respository.EmiPaymentRepo.EmiScheduleRepository;
-import com.example.Loan.main.respository.LoanAccountRepository;
 
+import com.example.Loan.main.respository.loandealcreation.LoanAccountRepository;
 import com.example.Loan.main.service.EmiPaymentService.EmailService;
 import com.example.Loan.main.service.EmiPaymentService.NotificationService;
 

@@ -9,24 +9,24 @@ import java.util.List;
 
 
 import com.example.Loan.main.entity.ForeClosureRequest;
+import com.example.Loan.main.entity.loandealcreation.Disbursement;
+import com.example.Loan.main.entity.loandealcreation.LoanAccount;
+import com.example.Loan.main.entity.loandealcreation.LoanDeal;
 import com.example.Loan.main.respository.ForeClosureRequestRepository;
+import com.example.Loan.main.respository.loandealcreation.DisbursementRepository;
+import com.example.Loan.main.respository.loandealcreation.LoanAccountRepository;
+import com.example.Loan.main.respository.loandealcreation.LoanDealRepository;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.Loan.main.dto.EmiPaymentDto.response.EmiScheduleResponse;
-import com.example.Loan.main.entity.Disbursement;
-import com.example.Loan.main.entity.LoanAccount;
-import com.example.Loan.main.entity.LoanDeal;
 import com.example.Loan.main.entity.EmiPaymentEntity.EmiSchedule;
 import com.example.Loan.main.entity.EmiPaymentEntity.LoanClosure;
 import com.example.Loan.main.enums.EmiPaymentEnums.EmiStatus;
 import com.example.Loan.main.exception.InvalidLoanDataException;
 import com.example.Loan.main.exception.LoanClosureException;
 import com.example.Loan.main.exception.ResourceNotFoundException;
-import com.example.Loan.main.respository.DisbursementRepository;
-import com.example.Loan.main.respository.LoanAccountRepository;
-import com.example.Loan.main.respository.LoanDealRepository;
 import com.example.Loan.main.respository.EmiPaymentRepo.EmiScheduleRepository;
 import com.example.Loan.main.respository.EmiPaymentRepo.LoanClosureRepository;
 import com.example.Loan.main.service.EmiPaymentService.EmiScheduleService;
