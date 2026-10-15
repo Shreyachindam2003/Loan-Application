@@ -7,7 +7,6 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 
-
 import com.example.Loan.main.entity.ForeClosureRequest;
 import com.example.Loan.main.respository.ForeClosureRequestRepository;
 import org.modelmapper.ModelMapper;
@@ -39,6 +38,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class EmiScheduleServiceImpl implements EmiScheduleService {
 
+    private static final BigDecimal ZERO = BigDecimal.ZERO;
+    private static final int MONEY_SCALE = 2;
+
     private final EmiScheduleRepository emiRepo;
     private final LoanAccountRepository accountRepo;
     private final LoanDealRepository dealRepo;
@@ -50,22 +52,18 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
     @Override
     @Transactional(readOnly = true)
     public List<EmiScheduleResponse> getEmiSchedule(Integer loanId) {
-
         if (!accountRepo.existsById(loanId)) {
             throw new ResourceNotFoundException(
                     "Loan account not found: " + loanId);
         }
 
-        return emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId)
-                .stream()
-                .map(e -> mapper.map(e, EmiScheduleResponse.class))
-                .toList();
+        return toResponse(
+                emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId));
     }
 
     @Override
     @Transactional(readOnly = true)
     public EmiScheduleResponse getEmiById(Integer id) {
-
         EmiSchedule emi = emiRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "EMI schedule not found: " + id));
@@ -77,8 +75,7 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
     @Transactional
     public List<EmiScheduleResponse> generateEmiSchedule(Integer loanId) {
 
-        log.info("Starting EMI schedule generation for Loan Account ID: {}",
-                loanId);
+        log.info("Starting EMI schedule generation for loanId: {}", loanId);
 
         LoanAccount account = accountRepo.findById(loanId)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -108,18 +105,16 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
                 || annualInterestRate == null
                 || deal.getTenureMonths() == null
                 || deal.getEmiDay() == null) {
-
             throw new InvalidLoanDataException(
                     "Loan or disbursement details are incomplete");
         }
 
-        if (principalAmount.compareTo(BigDecimal.ZERO) <= 0
-                || regularEmi.compareTo(BigDecimal.ZERO) <= 0
+        if (principalAmount.compareTo(ZERO) <= 0
+                || regularEmi.compareTo(ZERO) <= 0
                 || deal.getTenureMonths() <= 0
                 || deal.getEmiDay() < 1
                 || deal.getEmiDay() > 31
-                || annualInterestRate.compareTo(BigDecimal.ZERO) < 0) {
-
+                || annualInterestRate.compareTo(ZERO) < 0) {
             throw new InvalidLoanDataException(
                     "Invalid disbursed amount, EMI, interest rate, tenure or EMI day");
         }
@@ -128,10 +123,6 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
                 emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId);
 
         if (list.isEmpty()) {
-
-            log.info("Generating new EMI schedule for Loan Account ID: {}",
-                    loanId);
-
             createSchedule(
                     loanId,
                     principalAmount,
@@ -142,20 +133,6 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
                     disbursement.getDisbursementDate().toLocalDate());
 
             list = emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId);
-
-            log.info("EMI schedule generated. Installments: {}", list.size());
-
-        } else {
-
-            log.info(
-                    "EMI schedule already exists. Loan Account ID: {}, Installments: {}",
-                    loanId, list.size());
-
-            if (list.size() != deal.getTenureMonths()) {
-                log.warn(
-                        "Existing schedule count: {}, Original tenure: {}",
-                        list.size(), deal.getTenureMonths());
-            }
         }
 
         LoanClosure closure = closureRepo
@@ -164,13 +141,8 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
                 .orElse(null);
 
         if (closure == null) {
-            return list.stream()
-                    .map(e -> mapper.map(e, EmiScheduleResponse.class))
-                    .toList();
+            return toResponse(list);
         }
-
-        log.info("Processing closure. Closure ID: {}, Type: {}",
-                closure.getClosureId(), closure.getClosureType());
 
         if ("FULL".equalsIgnoreCase(closure.getClosureType())) {
 
@@ -178,28 +150,29 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
                     .filter(e -> e.getStatus() == EmiStatus.PENDING)
                     .forEach(e -> e.setStatus(EmiStatus.CLOSED));
 
+            account.setOutstandingPrincipal(money(ZERO));
+            accountRepo.save(account);
+
         } else if ("PARTIAL".equalsIgnoreCase(closure.getClosureType())) {
 
             BigDecimal outstanding = calculateOutstanding(
                     loanId, list, principalAmount);
 
-            if (outstanding.compareTo(BigDecimal.ZERO) <= 0) {
-
+            if (outstanding.compareTo(ZERO) <= 0) {
                 list.stream()
                         .filter(e -> e.getStatus() == EmiStatus.PENDING)
                         .forEach(e -> e.setStatus(EmiStatus.CLOSED));
 
+                outstanding = money(ZERO);
             } else {
-
                 recalculate(
-                        list,
-                        outstanding,
-                        annualInterestRate,
-                        regularEmi);
+                        list, outstanding, annualInterestRate, regularEmi);
             }
 
-        } else {
+            account.setOutstandingPrincipal(outstanding);
+            accountRepo.save(account);
 
+        } else {
             throw new LoanClosureException(
                     "Unsupported loan closure type: "
                             + closure.getClosureType());
@@ -210,18 +183,13 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
         closure.setIsProcessed(true);
         closureRepo.save(closure);
 
-        return emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId)
-                .stream()
-                .map(e -> mapper.map(e, EmiScheduleResponse.class))
-                .toList();
+        return toResponse(
+                emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId));
     }
 
     @Override
     @Transactional
     public List<EmiScheduleResponse> recalculateEmiSchedule(Integer loanId) {
-
-        log.info("Partial closure EMI recalculation started for loanId: {}",
-                loanId);
 
         LoanAccount account = accountRepo.findById(loanId)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -259,35 +227,27 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
         if (originalPrincipal == null
                 || regularEmi == null
                 || annualInterestRate == null) {
-
             throw new InvalidLoanDataException(
                     "Loan or EMI details are incomplete");
         }
 
         BigDecimal outstanding = calculateOutstanding(
                 loanId, list, originalPrincipal);
-        log.info("Final outstanding for recalculation: {}", outstanding);
 
-        if (outstanding.compareTo(BigDecimal.ZERO) < 0) {
+        if (outstanding.compareTo(ZERO) < 0) {
             throw new InvalidLoanDataException(
                     "Partial amount exceeds the outstanding principal");
         }
 
-        if (outstanding.compareTo(BigDecimal.ZERO) == 0) {
-
+        if (outstanding.compareTo(ZERO) == 0) {
             list.stream()
                     .filter(e -> e.getStatus() == EmiStatus.PENDING)
                     .forEach(e -> e.setStatus(EmiStatus.CLOSED));
 
             emiRepo.saveAll(list);
-
         } else {
-
             recalculate(
-                    list,
-                    outstanding,
-                    annualInterestRate,
-                    regularEmi);
+                    list, outstanding, annualInterestRate, regularEmi);
         }
 
         account.setOutstandingPrincipal(outstanding);
@@ -296,56 +256,47 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
         closure.setIsProcessed(true);
         closureRepo.save(closure);
 
-        log.info("Partial closure recalculation completed for loanId: {}",
-                loanId);
-
-        return emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId)
-                .stream()
-                .map(e -> mapper.map(e, EmiScheduleResponse.class))
-                .toList();
+        return toResponse(
+                emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId));
     }
-
 
     private BigDecimal calculateOutstanding(
             Integer loanId,
             List<EmiSchedule> list,
             BigDecimal originalPrincipal) {
 
-        // 1. Principal already paid through EMIs
         BigDecimal paidPrincipal = list.stream()
                 .filter(e -> e.getStatus() == EmiStatus.PAID)
                 .map(EmiSchedule::getPrincipalAmount)
                 .filter(amount -> amount != null)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .reduce(ZERO, BigDecimal::add);
 
-        // 2. Get paid partial prepayment requests
-        List<ForeClosureRequest> partialRequests =
-                foreClosureRepo
-                        .findByLoanAccountIdAndForeClosureTypeIgnoreCaseAndIsPaidTrue(
-                                loanId, "PARTIAL");
+        List<ForeClosureRequest> partialRequests = foreClosureRepo
+                .findByLoanAccountIdAndForeClosureTypeIgnoreCaseAndIsPaidTrue(
+                        loanId, "PARTIAL");
 
-        // 3. Total partial amount
         BigDecimal totalPartialAmount = partialRequests.stream()
                 .map(ForeClosureRequest::getPartialAmount)
                 .filter(amount -> amount != null)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .reduce(ZERO, BigDecimal::add);
 
-        // 4. Calculate outstanding
-        BigDecimal outstanding = originalPrincipal
-                .subtract(paidPrincipal)
-                .subtract(totalPartialAmount);
+        // Assumes each paid partialAmount is entirely principal prepayment.
+        BigDecimal outstanding = money(
+                originalPrincipal
+                        .subtract(paidPrincipal)
+                        .subtract(totalPartialAmount));
 
-        if (outstanding.compareTo(BigDecimal.ZERO) < 0) {
+        if (outstanding.compareTo(ZERO) < 0) {
             throw new InvalidLoanDataException(
                     "Paid EMI principal and partial amounts exceed original principal");
         }
 
         log.info(
-                "Outstanding calculation: loanId={}, originalPrincipal={}, paidPrincipal={}, partialAmount={}, outstanding={}",
+                "Outstanding: loanId={}, original={}, paidPrincipal={}, partial={}, outstanding={}",
                 loanId, originalPrincipal, paidPrincipal,
                 totalPartialAmount, outstanding);
 
-        return outstanding.setScale(2, RoundingMode.HALF_UP);
+        return outstanding;
     }
 
     private void createSchedule(
@@ -358,45 +309,37 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
             LocalDate disbursementDate) {
 
         BigDecimal monthlyRate = rate(annualInterestRate);
-        BigDecimal balance = principalAmount;
+        BigDecimal balance = money(principalAmount);
 
-        LocalDate firstDate = firstEmiDate(disbursementDate, emiDay);
-        YearMonth month = YearMonth.from(firstDate);
+        YearMonth month = YearMonth.from(
+                firstEmiDate(disbursementDate, emiDay));
 
-        for (int i = 1; i <= tenure; i++) {
+        for (int i = 1;
+             i <= tenure && balance.compareTo(ZERO) > 0;
+             i++) {
 
             LocalDate dueDate = getEmiDate(month, emiDay);
-            BigDecimal openingBalance = balance;
 
-            BigDecimal interest = balance.multiply(monthlyRate)
-                    .setScale(2, RoundingMode.HALF_UP);
+            // Reducing-balance interest: current balance × monthly rate.
+            BigDecimal interest = money(balance.multiply(monthlyRate));
 
-            BigDecimal principal = regularEmi.subtract(interest)
-                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal principal = money(regularEmi.subtract(interest));
 
-            BigDecimal currentEmi = regularEmi;
-
-            BigDecimal closingBalance = balance.subtract(principal)
-                    .setScale(2, RoundingMode.HALF_UP);
-
-            if (i == tenure || closingBalance.compareTo(BigDecimal.ZERO) < 0) {
-
-                principal = balance;
-                currentEmi = principal.add(interest)
-                        .setScale(2, RoundingMode.HALF_UP);
-                closingBalance = BigDecimal.ZERO;
-
-            } else if (principal.compareTo(BigDecimal.ZERO) <= 0) {
-
+            if (principal.compareTo(ZERO) <= 0) {
                 throw new InvalidLoanDataException(
-                        "Configured EMI is not sufficient to reduce loan principal");
+                        "EMI must be greater than the monthly interest amount");
             }
+
+            principal = principal.min(balance);
+
+            BigDecimal currentEmi = money(principal.add(interest));
+            BigDecimal closingBalance = money(balance.subtract(principal));
 
             EmiSchedule emi = new EmiSchedule();
             emi.setLoanAccountId(loanId);
             emi.setInstallmentNo(i);
             emi.setDueDate(dueDate);
-            emi.setOpeningBalance(openingBalance);
+            emi.setOpeningBalance(balance);
             emi.setEmiAmount(currentEmi);
             emi.setPrincipalAmount(principal);
             emi.setInterestAmount(interest);
@@ -406,18 +349,17 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
             emiRepo.save(emi);
 
             balance = closingBalance;
-
-            if (balance.compareTo(BigDecimal.ZERO) == 0) {
-                break;
-            }
-
             month = month.plusMonths(1);
         }
 
-        log.info("Created EMI installments for Loan Account ID: {}",
-                loanId);
-    }
+        if (balance.compareTo(ZERO) > 0) {
+            log.warn(
+                    "Schedule ended with remaining principal {} for loanId {}",
+                    balance, loanId);
+        }
 
+        log.info("Reducing-balance EMI schedule created for loanId: {}", loanId);
+    }
 
     private void recalculate(
             List<EmiSchedule> list,
@@ -427,6 +369,8 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
 
         LocalDate today = LocalDate.now();
 
+        // Keep paid and overdue/due-today EMI records unchanged.
+        // Recalculate only future pending installments.
         List<EmiSchedule> future = list.stream()
                 .filter(e -> e.getStatus() == EmiStatus.PENDING)
                 .filter(e -> e.getDueDate() != null
@@ -434,64 +378,40 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
                 .toList();
 
         if (future.isEmpty()) {
-            log.warn("No future pending EMIs available for recalculation");
+            log.warn("No future pending EMIs available for recalculation.");
             return;
         }
 
         BigDecimal monthlyRate = rate(annualInterestRate);
-        BigDecimal balance = outstanding;
-        boolean loanCompleted = false;
+        BigDecimal balance = money(outstanding);
 
         for (EmiSchedule emi : future) {
 
-            // Loan already closed: reset remaining future installments
-            if (loanCompleted || balance.compareTo(BigDecimal.ZERO) <= 0) {
-                emi.setOpeningBalance(BigDecimal.ZERO);
-                emi.setInterestAmount(BigDecimal.ZERO);
-                emi.setPrincipalAmount(BigDecimal.ZERO);
-                emi.setEmiAmount(BigDecimal.ZERO);
-                emi.setClosingBalance(BigDecimal.ZERO);
+            if (balance.compareTo(ZERO) <= 0) {
+                emi.setOpeningBalance(money(ZERO));
+                emi.setInterestAmount(money(ZERO));
+                emi.setPrincipalAmount(money(ZERO));
+                emi.setEmiAmount(money(ZERO));
+                emi.setClosingBalance(money(ZERO));
                 emi.setStatus(EmiStatus.CLOSED);
                 continue;
             }
 
-            BigDecimal openingBalance = balance;
+            // Recalculate interest on the remaining principal every month.
+            BigDecimal interest = money(balance.multiply(monthlyRate));
+            BigDecimal principal = money(regularEmi.subtract(interest));
 
-            BigDecimal interest = openingBalance
-                    .multiply(monthlyRate)
-                    .setScale(2, RoundingMode.HALF_UP);
-
-            BigDecimal principal = regularEmi.subtract(interest)
-                    .setScale(2, RoundingMode.HALF_UP);
-
-            if (principal.compareTo(BigDecimal.ZERO) <= 0) {
+            if (principal.compareTo(ZERO) <= 0) {
                 throw new InvalidLoanDataException(
-                        "Configured EMI is not sufficient to reduce outstanding principal");
+                        "EMI must be greater than the monthly interest amount");
             }
 
-            BigDecimal currentEmi;
-            BigDecimal closingBalance;
+            principal = principal.min(balance);
 
-            // Final EMI: collect only the remaining principal plus interest
-            if (principal.compareTo(openingBalance) >= 0) {
+            BigDecimal currentEmi = money(principal.add(interest));
+            BigDecimal closingBalance = money(balance.subtract(principal));
 
-                principal = openingBalance;
-
-                currentEmi = principal.add(interest)
-                        .setScale(2, RoundingMode.HALF_UP);
-
-                closingBalance = BigDecimal.ZERO;
-                loanCompleted = true;
-
-            } else {
-
-                currentEmi = regularEmi;
-
-                closingBalance = openingBalance.subtract(principal)
-                        .setScale(2, RoundingMode.HALF_UP);
-            }
-
-            emi.setOpeningBalance(openingBalance);
+            emi.setOpeningBalance(balance);
             emi.setInterestAmount(interest);
             emi.setPrincipalAmount(principal);
             emi.setEmiAmount(currentEmi);
@@ -503,16 +423,25 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
         emiRepo.saveAll(future);
 
         log.info(
-                "EMI recalculation completed. Outstanding: {}, Final balance: {}, Loan completed: {}",
-                outstanding, balance, loanCompleted);
+                "Reducing-balance recalculation completed. Starting outstanding={}, remaining={}",
+                outstanding, balance);
     }
 
+    private List<EmiScheduleResponse> toResponse(List<EmiSchedule> list) {
+        return list.stream()
+                .map(e -> mapper.map(e, EmiScheduleResponse.class))
+                .toList();
+    }
 
     private BigDecimal rate(BigDecimal annualRate) {
         return annualRate.divide(
                 BigDecimal.valueOf(1200),
                 10,
                 RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal money(BigDecimal amount) {
+        return amount.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
     }
 
     private LocalDate firstEmiDate(
@@ -527,8 +456,7 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
         }
 
         return getEmiDate(
-                YearMonth.from(disbursementDate).plusMonths(1),
-                emiDay);
+                YearMonth.from(disbursementDate).plusMonths(1), emiDay);
     }
 
     private LocalDate getEmiDate(YearMonth month, int emiDay) {
