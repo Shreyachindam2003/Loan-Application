@@ -1,8 +1,9 @@
 package com.example.Loan.main.dto.EmiPaymentDto.response;
 
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
+
+import com.example.Loan.main.enums.EmiPaymentEnums.EmiStatus;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -21,4 +22,5 @@ public class CurrentEmiResponse {
     private BigDecimal totalPayable;
 
     private Integer daysLate;
+    private EmiStatus status;
 }

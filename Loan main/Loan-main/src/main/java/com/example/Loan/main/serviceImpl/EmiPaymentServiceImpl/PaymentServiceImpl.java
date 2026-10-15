@@ -1,9 +1,11 @@
+
 package com.example.Loan.main.serviceImpl.EmiPaymentServiceImpl;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 
 import org.modelmapper.ModelMapper;
@@ -59,17 +61,19 @@ public class PaymentServiceImpl implements PaymentService {
                     "Valid loan account ID is required");
         }
 
-        EmiSchedule emi = getPendingEmi(loanAccountId);
+        EmiSchedule emi = getCurrentDueEmi(loanAccountId);
         int daysLate = getDaysLate(emi);
 
-        BigDecimal penalty = BigDecimal.valueOf(daysLate);
-        BigDecimal bonus = daysLate > 0
-                ? BigDecimal.valueOf(500)
+        BigDecimal penalty = daysLate > 0
+                ? BigDecimal.valueOf(daysLate)
                 : BigDecimal.ZERO;
+
+        BigDecimal bonus = BigDecimal.ZERO;
 
         CurrentEmiResponse response =
                 mapper.map(emi, CurrentEmiResponse.class);
 
+        response.setStatus(emi.getStatus());
         response.setDaysLate(daysLate);
         response.setPenaltyAmount(penalty);
         response.setBonusAmount(bonus);
@@ -77,9 +81,8 @@ public class PaymentServiceImpl implements PaymentService {
                 emi.getEmiAmount().add(penalty).add(bonus));
 
         log.info(
-                "Current EMI calculated. loanAccountId={}, emiScheduleId={}, daysLate={}, totalPayable={}",
-                loanAccountId, emi.getEmiScheduleId(),
-                daysLate, response.getTotalPayable());
+                "Current due EMI fetched. loanAccountId={}, emiScheduleId={}",
+                loanAccountId, emi.getEmiScheduleId());
 
         return response;
     }
@@ -103,7 +106,6 @@ public class PaymentServiceImpl implements PaymentService {
 
         String idempotencyKey = req.getIdempotencyKey();
 
-        // Check idempotency before creating a new Razorpay order.
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
 
             LoanPayment existingPayment = paymentRepo
@@ -141,18 +143,20 @@ public class PaymentServiceImpl implements PaymentService {
                     "Only a pending EMI can be paid");
         }
 
-        EmiSchedule currentEmi = getPendingEmi(req.getLoanAccountId());
+        EmiSchedule currentEmi =
+                getCurrentDueEmi(req.getLoanAccountId());
 
         if (!currentEmi.getEmiScheduleId().equals(
                 emi.getEmiScheduleId())) {
             throw new InvalidPaymentException(
-                    "Only current EMI can be paid");
+                    "Only the currently due EMI can be paid");
         }
 
         BigDecimal amount = getCurrentEmi(
                 req.getLoanAccountId()).getTotalPayable();
 
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+        if (amount == null
+                || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidPaymentException(
                     "Payment amount must be greater than zero");
         }
@@ -223,7 +227,6 @@ public class PaymentServiceImpl implements PaymentService {
 
         if (payment.getPaymentStatus() == PaymentStatus.SUCCESS) {
 
-            // A successful payment cannot be reused with different IDs.
             if (!req.getRazorpayPaymentId().equals(
                     payment.getRazorpayPaymentId())) {
                 throw new InvalidPaymentException(
@@ -275,22 +278,18 @@ public class PaymentServiceImpl implements PaymentService {
                     "EMI is no longer pending");
         }
 
-        EmiSchedule currentEmi = getPendingEmi(
-                payment.getLoanAccountId());
+        EmiSchedule currentEmi =
+                getCurrentDueEmi(payment.getLoanAccountId());
 
         if (!currentEmi.getEmiScheduleId().equals(
                 emi.getEmiScheduleId())) {
             throw new InvalidPaymentException(
-                    "This is no longer the current EMI");
+                    "This is no longer the currently due EMI");
         }
 
         int daysLate = getDaysLate(emi);
         LocalDate today = LocalDate.now();
 
-        /*
-         * Record charges only after signature verification.
-         * The repository must provide the exists... method shown below.
-         */
         if (daysLate > 0) {
 
             boolean penaltyExists = penaltyRepo
@@ -451,10 +450,10 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     // =========================================================
-    // GET CURRENT / PENDING EMI
+    // GET CURRENT DUE EMI
     // =========================================================
 
-    private EmiSchedule getPendingEmi(Integer loanAccountId) {
+    private EmiSchedule getCurrentDueEmi(Integer loanAccountId) {
 
         if (loanAccountId == null || loanAccountId <= 0) {
             throw new InvalidPaymentException(
@@ -462,11 +461,14 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         return emiRepo
-                .findFirstByLoanAccountIdAndStatusOrderByInstallmentNoAsc(
-                        loanAccountId, EmiStatus.PENDING)
+                .findByLoanAccountIdAndStatusAndDueDateLessThanEqualOrderByInstallmentNoAsc(
+                        loanAccountId,
+                        EmiStatus.PENDING,
+                        LocalDate.now())
+                .stream()
+                .min(Comparator.comparing(EmiSchedule::getInstallmentNo))
                 .orElseThrow(() -> new EmiNotFoundException(
-                        "No pending EMI found for loan account: "
-                                + loanAccountId));
+                        "No EMI is currently due for payment"));
     }
 
     // =========================================================

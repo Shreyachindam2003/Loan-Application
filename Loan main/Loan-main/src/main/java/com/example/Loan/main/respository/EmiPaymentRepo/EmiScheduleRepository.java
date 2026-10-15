@@ -1,6 +1,7 @@
 package com.example.Loan.main.respository.EmiPaymentRepo;
 
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,4 +30,9 @@ public interface EmiScheduleRepository
             Integer installmentNo);
 
     List<EmiSchedule> findByStatus(EmiStatus status);
+
+    List<EmiSchedule> findByLoanAccountIdAndStatusAndDueDateLessThanEqualOrderByInstallmentNoAsc(
+            Integer loanAccountId,
+            EmiStatus status,
+            LocalDate dueDate);
 }
