@@ -16,6 +16,7 @@ public interface AuthService {
     MessageResponse enable2fa(String email, String code);
     MessageResponse disable2fa(String email, String code);
     AuthResponse oauthLogin(String email);
+    AuthResponse verifyOAuth2Factor(String email, String code);
 
     @Transactional
     AuthResponse issueTokens(User user);

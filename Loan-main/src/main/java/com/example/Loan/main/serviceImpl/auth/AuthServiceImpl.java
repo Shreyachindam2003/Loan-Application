@@ -27,7 +27,7 @@ import java.math.BigDecimal;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
-import java.util.Random;
+import java.security.SecureRandom;
 import java.util.UUID;
 
 @Service
@@ -115,7 +115,7 @@ public class AuthServiceImpl implements AuthService {
         // Generate OTP
         String otp = String.format(
                 "%06d",
-                new Random().nextInt(1_000_000));
+                new SecureRandom().nextInt(1_000_000));
 
         // =========================
         // CREATE CUSTOMER
@@ -171,10 +171,7 @@ public class AuthServiceImpl implements AuthService {
         user.setLastName(r.lastName());
         user.setEmail(email);
         user.setMobile(r.mobileNumber());
-
-        user.setPassword(
-                passwordEncoder.encode(r.password()));
-
+        user.setPassword(passwordEncoder.encode(r.password()));
         user.setTwoFactorEnabled(false);
 
         userRepository.save(user);
@@ -272,7 +269,7 @@ public class AuthServiceImpl implements AuthService {
 
         String otp = String.format(
                 "%06d",
-                new Random().nextInt(1_000_000));
+                new SecureRandom().nextInt(1_000_000));
 
         customer.setVerificationOtpHash(
                 hash(otp));
@@ -378,12 +375,9 @@ public class AuthServiceImpl implements AuthService {
                     "Refresh token expired or revoked");
         }
 
-        return new AuthResponse(
-                jwtService.generateAccessToken(
-                        token.getUser().getEmail()),
-                rawRefreshToken,
-                false,
-                "Token refreshed");
+        token.setRevoked(true);
+        refreshTokenRepository.save(token);
+        return issueTokens(token.getUser());
     }
 
     // =========================
@@ -506,15 +500,51 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public AuthResponse oauthLogin(String email) {
 
-        User user =
-                userRepository
-                        .findByEmail(
-                                email.toLowerCase().trim())
-                        .orElseThrow(() ->
-                                new ResponseStatusException(
-                                        HttpStatus.UNAUTHORIZED,
-                                        "Google user not found"));
+        User user = userRepository
+                .findByEmail(email.toLowerCase().trim())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Google user not found"));
 
+        if (user.getCustomer() != null
+                && !Boolean.TRUE.equals(user.getCustomer().getEmailVerified())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Please verify email before using Google login");
+        }
+
+        // Never issue full access/refresh tokens before authenticator verification.
+        if (user.getTwoFactorSecret() == null || user.getTwoFactorSecret().isBlank()) {
+            String secret = totpService.generateSecret();
+            user.setTwoFactorSecret(secret);
+            user.setTwoFactorEnabled(false);
+            userRepository.save(user);
+            return new AuthResponse(null, null, true,
+                    "FIRST_TIME_2FA_SETUP_REQUIRED", totpService.provisioningUri(user.getEmail(), secret));
+        }
+
+        return new AuthResponse(null, null, true,
+                Boolean.TRUE.equals(user.getTwoFactorEnabled())
+                        ? "AUTHENTICATOR_CODE_REQUIRED"
+                        : "FIRST_TIME_2FA_SETUP_REQUIRED",
+                totpService.provisioningUri(user.getEmail(), user.getTwoFactorSecret()));
+    }
+
+
+    @Override
+    @Transactional
+    public AuthResponse verifyOAuth2Factor(String email, String code) {
+        User user = getUser(email);
+        if (user.getTwoFactorSecret() == null || user.getTwoFactorSecret().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Start Google login to initialize authenticator setup");
+        }
+        if (!totpService.verifyCode(user.getTwoFactorSecret(), code)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Invalid authenticator code");
+        }
+        if (!Boolean.TRUE.equals(user.getTwoFactorEnabled())) {
+            user.setTwoFactorEnabled(true);
+            userRepository.save(user);
+        }
         return issueTokens(user);
     }
 
@@ -550,11 +580,17 @@ public class AuthServiceImpl implements AuthService {
 
         refreshTokenRepository.save(entity);
 
+        String roleName = user.getRole() != null
+                ? user.getRole().getRoleName()
+                : null;
+
         return new AuthResponse(
                 access,
                 refresh,
                 false,
-                "Login successful");
+                "Login successful",
+                null,
+                roleName);
     }
 
     // =========================

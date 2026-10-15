@@ -1,4 +1,3 @@
-
 package com.example.Loan.main.config.auth;
 
 import com.example.Loan.main.security.auth.JwtAuthenticationFilter;
@@ -29,15 +28,12 @@ public class SecurityConfig {
     public SecurityConfig(
             JwtAuthenticationFilter jwtFilter,
             OAuth2SuccessHandler oauth2SuccessHandler) {
-
         this.jwtFilter = jwtFilter;
         this.oauth2SuccessHandler = oauth2SuccessHandler;
     }
 
-    // CORS configuration for Angular frontend
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-
         CorsConfiguration config = new CorsConfiguration();
 
         config.setAllowedOrigins(
@@ -80,22 +76,18 @@ public class SecurityConfig {
             HttpSecurity http) throws Exception {
 
         http
-                // Enable CORS for Angular
                 .cors(cors ->
                         cors.configurationSource(corsConfigurationSource())
                 )
 
-                // Existing CSRF configuration
                 .csrf(csrf -> csrf.disable())
 
-                // Existing stateless JWT configuration
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
                                 SessionCreationPolicy.STATELESS
                         )
                 )
 
-                // Existing authorization rules
                 .authorizeHttpRequests(auth -> auth
 
                         .requestMatchers(HttpMethod.OPTIONS, "/**")
@@ -111,14 +103,31 @@ public class SecurityConfig {
                                 "/login/oauth2/**"
                         ).permitAll()
 
+                        // Customer-only EMI schedule endpoint
                         .requestMatchers(
-                                "/api/closure/complete"
-                        ).permitAll()
+                                HttpMethod.GET,
+                                "/api/v1/emi-schedules/my"
+                        ).hasRole("USER")
+
+                        // Existing closure permissions
+                        .requestMatchers("/api/closure/requests")
+                        .hasRole("LOAN_OFFICER")
+
+                        .requestMatchers("/api/closure/payment")
+                        .hasRole("LOAN_OFFICER")
+
+                        .requestMatchers("/api/closure/complete")
+                        .hasRole("LOAN_OFFICER")
+
+                        .requestMatchers("/api/closure/request")
+                        .hasRole("USER")
+
+                        .requestMatchers("/api/v1/customers/me")
+                        .hasAnyRole("USER", "LOAN_OFFICER")
 
                         .anyRequest().authenticated()
                 )
 
-                // Existing exception handling
                 .exceptionHandling(exception ->
                         exception.authenticationEntryPoint(
                                 new HttpStatusEntryPoint(
@@ -127,14 +136,10 @@ public class SecurityConfig {
                         )
                 )
 
-                // Existing OAuth2 success handler
                 .oauth2Login(oauth ->
-                        oauth.successHandler(
-                                oauth2SuccessHandler
-                        )
+                        oauth.successHandler(oauth2SuccessHandler)
                 )
 
-                // Existing JWT filter
                 .addFilterBefore(
                         jwtFilter,
                         UsernamePasswordAuthenticationFilter.class

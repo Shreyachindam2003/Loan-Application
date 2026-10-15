@@ -38,6 +38,12 @@ public class AuthController {
         return service.login(request);
     }
 
+    @PostMapping("/oauth2/2fa/verify")
+    public AuthResponse verifyOAuth2TwoFactor(
+            @Valid @RequestBody OAuth2TwoFactorRequest request) {
+        return service.verifyOAuth2Factor(request.email(), request.code());
+    }
+
     @PostMapping("/refresh")
     public AuthResponse refresh(@Valid @RequestBody RefreshRequest request) {
         return service.refresh(request.refreshToken());
