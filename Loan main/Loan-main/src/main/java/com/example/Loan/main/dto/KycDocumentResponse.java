@@ -1,0 +1,26 @@
+package com.example.Loan.main.dto;
+
+
+import com.example.Loan.main.enums.DocumentStatus;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class KycDocumentResponse {
+
+    private String customerName;
+    private String email;
+    private String mobile;
+    private Integer documentId;
+    private Integer customerId;
+    private String documentType;
+    private String filePath;
+    private DocumentStatus verificationStatus;
+
+}
