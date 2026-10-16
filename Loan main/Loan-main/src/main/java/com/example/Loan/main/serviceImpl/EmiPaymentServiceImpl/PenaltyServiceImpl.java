@@ -43,20 +43,23 @@ public class PenaltyServiceImpl implements PenaltyService {
         }
 
         Map<Integer, PenaltyResponse> result = new LinkedHashMap<>();
+        BigDecimal zero = BigDecimal.ZERO;
+        LocalDate today = LocalDate.now();
 
         // Existing saved charges
         for (PenaltyCharge charge : penaltyRepo.findByLoanAccountId(loanAccountId)) {
+
             Integer emiId = charge.getEmiScheduleId();
 
             PenaltyResponse dto = result.computeIfAbsent(emiId, id -> {
                 PenaltyResponse r = mapper.map(charge, PenaltyResponse.class);
-                r.setPenaltyAmount(BigDecimal.ZERO);
-                r.setBonusAmount(BigDecimal.ZERO);
+                r.setPenaltyAmount(zero);
+                r.setBonusAmount(zero);
                 return r;
             });
 
             BigDecimal amount = charge.getAmount() == null
-                    ? BigDecimal.ZERO : charge.getAmount();
+                    ? zero : charge.getAmount();
 
             if (charge.getChargeType() == ChargeType.PENALTY) {
                 dto.setPenaltyAmount(dto.getPenaltyAmount().add(amount));
@@ -70,14 +73,13 @@ public class PenaltyServiceImpl implements PenaltyService {
                     charge.getDaysLate() == null ? 0 : charge.getDaysLate()));
         }
 
-        // Dynamically calculate charges for overdue pending EMIs
-        LocalDate today = LocalDate.now();
-
+        // Calculate charges for overdue pending EMIs
         List<EmiSchedule> overdueEmis =
                 emiRepo.findByLoanAccountIdAndStatusAndDueDateLessThanEqualOrderByInstallmentNoAsc(
                         loanAccountId, EmiStatus.PENDING, today);
 
         for (EmiSchedule emi : overdueEmis) {
+
             if (emi.getDueDate() == null) {
                 continue;
             }
@@ -102,13 +104,13 @@ public class PenaltyServiceImpl implements PenaltyService {
                         return r;
                     });
 
-            // Replace with current calculated values, don't add them twice
             dto.setPenaltyAmount(penalty);
             dto.setBonusAmount(bonus);
             dto.setAmount(penalty.add(bonus));
             dto.setDaysLate(daysLate);
         }
 
+        log.info("Penalties fetched for loanAccountId={}", loanAccountId);
         return new ArrayList<>(result.values());
     }
 

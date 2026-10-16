@@ -6,7 +6,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
 import java.util.List;
 
 import org.modelmapper.ModelMapper;
@@ -38,10 +37,12 @@ import com.razorpay.Order;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PaymentServiceImpl implements PaymentService {
+
+    private static final BigDecimal ZERO = BigDecimal.ZERO;
 
     private final EmiScheduleRepository emiRepo;
     private final LoanPaymentRepository paymentRepo;
@@ -49,48 +50,35 @@ public class PaymentServiceImpl implements PaymentService {
     private final RazorpayUtil razorpayUtil;
     private final ModelMapper mapper;
 
-    // =========================================================
-    // CURRENT EMI
-    // =========================================================
-
     @Override
     @Transactional(readOnly = true)
     public CurrentEmiResponse getCurrentEmi(Integer loanAccountId) {
 
         if (loanAccountId == null || loanAccountId <= 0) {
-            throw new InvalidPaymentException(
-                    "Valid loan account ID is required");
+            throw new InvalidPaymentException("Valid loan account ID is required");
         }
 
         EmiSchedule emi = getCurrentDueEmi(loanAccountId);
-
         int daysLate = getDaysLate(emi);
-        BigDecimal penalty = BigDecimal.valueOf(daysLate);
-        BigDecimal bonus = calculateBonus(emi, daysLate);
 
-        CurrentEmiResponse response =
-                mapper.map(emi, CurrentEmiResponse.class);
-
+        CurrentEmiResponse response = mapper.map(emi, CurrentEmiResponse.class);
         response.setStatus(emi.getStatus());
         response.setDaysLate(daysLate);
-        response.setPenaltyAmount(penalty);
-        response.setBonusAmount(bonus);
+        response.setPenaltyAmount(BigDecimal.valueOf(daysLate));
+        response.setBonusAmount(calculateBonus(emi, daysLate));
         response.setTotalPayable(
-                emi.getEmiAmount().add(penalty).add(bonus));
+                emi.getEmiAmount()
+                        .add(response.getPenaltyAmount())
+                        .add(response.getBonusAmount()));
 
         return response;
     }
-
-    // =========================================================
-    // CREATE RAZORPAY ORDER
-    // =========================================================
 
     @Override
     @Transactional
     public PaymentResponse createOrder(PaymentRequest req) {
 
-        if (req == null
-                || req.getLoanAccountId() == null
+        if (req == null || req.getLoanAccountId() == null
                 || req.getLoanAccountId() <= 0
                 || req.getEmiScheduleId() == null
                 || req.getEmiScheduleId() <= 0) {
@@ -98,68 +86,46 @@ public class PaymentServiceImpl implements PaymentService {
                     "Valid loan account ID and EMI schedule ID are required");
         }
 
-        String idempotencyKey = req.getIdempotencyKey();
+        String key = req.getIdempotencyKey();
 
-        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+        if (key != null && !key.isBlank()) {
+            LoanPayment existing = paymentRepo.findByIdempotencyKey(key).orElse(null);
 
-            LoanPayment existingPayment = paymentRepo
-                    .findByIdempotencyKey(idempotencyKey)
-                    .orElse(null);
-
-            if (existingPayment != null) {
-
-                if (!req.getLoanAccountId().equals(
-                        existingPayment.getLoanAccountId())
-                        || !req.getEmiScheduleId().equals(
-                        existingPayment.getEmiScheduleId())) {
+            if (existing != null) {
+                if (!req.getLoanAccountId().equals(existing.getLoanAccountId())
+                        || !req.getEmiScheduleId().equals(existing.getEmiScheduleId())) {
                     throw new InvalidPaymentException(
                             "Idempotency key was already used for another payment");
                 }
 
-                log.info(
-                        "Returning existing payment. paymentId={}",
-                        existingPayment.getPaymentId());
-
-                return mapper.map(
-                        existingPayment, PaymentResponse.class);
+                log.info("Returning existing payment. paymentId={}",
+                        existing.getPaymentId());
+                return mapper.map(existing, PaymentResponse.class);
             }
         }
 
         EmiSchedule emi = getEmi(req.getEmiScheduleId());
 
         if (!req.getLoanAccountId().equals(emi.getLoanAccountId())) {
-            throw new InvalidPaymentException(
-                    "EMI does not belong to this loan account");
+            throw new InvalidPaymentException("EMI does not belong to this loan account");
         }
-
         if (emi.getStatus() != EmiStatus.PENDING) {
-            throw new InvalidPaymentException(
-                    "Only a pending EMI can be paid");
+            throw new InvalidPaymentException("Only a pending EMI can be paid");
+        }
+        if (!getCurrentDueEmi(req.getLoanAccountId())
+                .getEmiScheduleId().equals(emi.getEmiScheduleId())) {
+            throw new InvalidPaymentException("Only the currently due EMI can be paid");
         }
 
-        EmiSchedule currentEmi =
-                getCurrentDueEmi(req.getLoanAccountId());
+        BigDecimal amount = getCurrentEmi(req.getLoanAccountId()).getTotalPayable();
 
-        if (!currentEmi.getEmiScheduleId().equals(
-                emi.getEmiScheduleId())) {
-            throw new InvalidPaymentException(
-                    "Only the currently due EMI can be paid");
-        }
-
-        BigDecimal amount = getCurrentEmi(
-                req.getLoanAccountId()).getTotalPayable();
-
-        if (amount == null
-                || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidPaymentException(
-                    "Payment amount must be greater than zero");
+        if (amount == null || amount.compareTo(ZERO) <= 0) {
+            throw new InvalidPaymentException("Payment amount must be greater than zero");
         }
 
         try {
-            Order order = razorpayUtil.createOrder(
-                    amount,
-                    "LOAN_" + req.getLoanAccountId()
-                            + "_EMI_" + req.getEmiScheduleId());
+            Order order = razorpayUtil.createOrder(amount,
+                    "LOAN_" + req.getLoanAccountId() + "_EMI_" + req.getEmiScheduleId());
 
             LoanPayment payment = new LoanPayment();
             payment.setLoanAccountId(req.getLoanAccountId());
@@ -167,44 +133,31 @@ public class PaymentServiceImpl implements PaymentService {
             payment.setAmount(amount);
             payment.setPaymentStatus(PaymentStatus.CREATED);
             payment.setPaymentType(PaymentType.EMI);
-            payment.setIdempotencyKey(idempotencyKey);
+            payment.setIdempotencyKey(key);
             payment.setRazorpayOrderId(order.get("id"));
             payment.setPaymentDate(LocalDateTime.now());
 
-            LoanPayment savedPayment = paymentRepo.save(payment);
+            LoanPayment saved = paymentRepo.save(payment);
 
-            log.info(
-                    "Razorpay order created. paymentId={}, loanAccountId={}, emiScheduleId={}, amount={}",
-                    savedPayment.getPaymentId(),
-                    req.getLoanAccountId(),
-                    req.getEmiScheduleId(),
-                    amount);
+            log.info("Razorpay order created. paymentId={}, loanAccountId={}, amount={}",
+                    saved.getPaymentId(), req.getLoanAccountId(), amount);
 
-            return mapper.map(savedPayment, PaymentResponse.class);
+            return mapper.map(saved, PaymentResponse.class);
 
         } catch (InvalidPaymentException e) {
             throw e;
         } catch (Exception e) {
-            log.error(
-                    "Unable to create Razorpay order. loanAccountId={}, emiScheduleId={}",
-                    req.getLoanAccountId(),
-                    req.getEmiScheduleId(), e);
-
-            throw new PaymentProcessingException(
-                    "Unable to create payment order", e);
+            log.error("Unable to create Razorpay order for loan {}",
+                    req.getLoanAccountId(), e);
+            throw new PaymentProcessingException("Unable to create payment order", e);
         }
     }
-
-    // =========================================================
-    // VERIFY RAZORPAY PAYMENT
-    // =========================================================
 
     @Override
     @Transactional
     public PaymentResponse verifyPayment(PaymentRequest req) {
 
-        if (req == null
-                || req.getRazorpayOrderId() == null
+        if (req == null || req.getRazorpayOrderId() == null
                 || req.getRazorpayOrderId().isBlank()
                 || req.getRazorpayPaymentId() == null
                 || req.getRazorpayPaymentId().isBlank()
@@ -220,145 +173,97 @@ public class PaymentServiceImpl implements PaymentService {
                         "Payment not found for the supplied order ID"));
 
         if (payment.getPaymentStatus() == PaymentStatus.SUCCESS) {
-
-            if (!req.getRazorpayPaymentId().equals(
-                    payment.getRazorpayPaymentId())) {
+            if (!req.getRazorpayPaymentId().equals(payment.getRazorpayPaymentId())) {
                 throw new InvalidPaymentException(
                         "Payment is already verified with another payment ID");
             }
-
-            log.info(
-                    "Payment already verified. paymentId={}",
-                    payment.getPaymentId());
-
             return mapper.map(payment, PaymentResponse.class);
         }
 
         if (payment.getPaymentStatus() != PaymentStatus.CREATED) {
-            throw new InvalidPaymentException(
-                    "Payment is not in a verifiable state");
+            throw new InvalidPaymentException("Payment is not in a verifiable state");
         }
 
         boolean verified;
-
         try {
             verified = razorpayUtil.verifyPayment(
                     req.getRazorpayOrderId(),
                     req.getRazorpayPaymentId(),
                     req.getRazorpaySignature());
-
         } catch (Exception e) {
-            log.error(
-                    "Razorpay signature verification error. paymentId={}",
+            log.error("Razorpay verification error. paymentId={}",
                     payment.getPaymentId(), e);
-
-            throw new PaymentProcessingException(
-                    "Unable to verify Razorpay payment", e);
+            throw new PaymentProcessingException("Unable to verify Razorpay payment", e);
         }
 
         if (!verified) {
-            log.warn(
-                    "Razorpay signature verification failed. paymentId={}",
-                    payment.getPaymentId());
-
-            throw new InvalidPaymentException(
-                    "Payment verification failed");
+            log.warn("Payment verification failed. paymentId={}", payment.getPaymentId());
+            throw new InvalidPaymentException("Payment verification failed");
         }
 
         EmiSchedule emi = getEmi(payment.getEmiScheduleId());
 
         if (emi.getStatus() != EmiStatus.PENDING) {
-            throw new InvalidPaymentException(
-                    "EMI is no longer pending");
+            throw new InvalidPaymentException("EMI is no longer pending");
         }
-
-        EmiSchedule currentEmi =
-                getCurrentDueEmi(payment.getLoanAccountId());
-
-        if (!currentEmi.getEmiScheduleId().equals(
-                emi.getEmiScheduleId())) {
-            throw new InvalidPaymentException(
-                    "This is no longer the currently due EMI");
+        if (!getCurrentDueEmi(payment.getLoanAccountId())
+                .getEmiScheduleId().equals(emi.getEmiScheduleId())) {
+            throw new InvalidPaymentException("This is no longer the currently due EMI");
         }
 
         int daysLate = getDaysLate(emi);
         LocalDate today = LocalDate.now();
 
         if (daysLate > 0) {
+            saveCharge(payment, emi, ChargeType.PENALTY,
+                    BigDecimal.valueOf(daysLate), daysLate, today);
 
-            boolean penaltyExists = penaltyRepo
-                    .existsByEmiScheduleIdAndChargeType(
-                            emi.getEmiScheduleId(), ChargeType.PENALTY);
-
-            if (!penaltyExists) {
-                PenaltyCharge penalty = new PenaltyCharge();
-                penalty.setLoanAccountId(payment.getLoanAccountId());
-                penalty.setEmiScheduleId(emi.getEmiScheduleId());
-                penalty.setChargeType(ChargeType.PENALTY);
-                penalty.setAmount(BigDecimal.valueOf(daysLate));
-                penalty.setChargeDate(today);
-                penalty.setDaysLate(daysLate);
-                penalty.setPaymentId(payment.getPaymentId());
-
-                penaltyRepo.save(penalty);
+            BigDecimal bonus = calculateBonus(emi, daysLate);
+            if (bonus.compareTo(ZERO) > 0) {
+                saveCharge(payment, emi, ChargeType.BONUS, bonus, daysLate, today);
             }
-
-
-            BigDecimal bonusAmount = calculateBonus(emi, daysLate);
-
-            if (bonusAmount.compareTo(BigDecimal.ZERO) > 0) {
-
-                boolean bonusExists = penaltyRepo
-                        .existsByEmiScheduleIdAndChargeType(
-                                emi.getEmiScheduleId(), ChargeType.BONUS);
-
-                if (!bonusExists) {
-                    PenaltyCharge bonus = new PenaltyCharge();
-                    bonus.setLoanAccountId(payment.getLoanAccountId());
-                    bonus.setEmiScheduleId(emi.getEmiScheduleId());
-                    bonus.setChargeType(ChargeType.BONUS);
-                    bonus.setAmount(bonusAmount);
-                    bonus.setChargeDate(today);
-                    bonus.setDaysLate(daysLate);
-                    bonus.setPaymentId(payment.getPaymentId());
-
-                    penaltyRepo.save(bonus);
-                }
-            }
-
         }
 
         payment.setRazorpayPaymentId(req.getRazorpayPaymentId());
         payment.setRazorpaySignature(req.getRazorpaySignature());
         payment.setPaymentStatus(PaymentStatus.SUCCESS);
         payment.setPaymentDate(LocalDateTime.now());
-
         emi.setStatus(EmiStatus.PAID);
 
-        LoanPayment savedPayment = paymentRepo.save(payment);
+        LoanPayment saved = paymentRepo.save(payment);
         emiRepo.save(emi);
 
-        log.info(
-                "Payment verified successfully. paymentId={}, loanAccountId={}, emiScheduleId={}, daysLate={}",
-                savedPayment.getPaymentId(),
-                savedPayment.getLoanAccountId(),
-                emi.getEmiScheduleId(),
-                daysLate);
+        log.info("Payment successful. paymentId={}, loanAccountId={}, emiScheduleId={}",
+                saved.getPaymentId(), saved.getLoanAccountId(), emi.getEmiScheduleId());
 
-        return mapper.map(savedPayment, PaymentResponse.class);
+        return mapper.map(saved, PaymentResponse.class);
     }
 
-    // =========================================================
-    // GET PAYMENT
-    // =========================================================
+    private void saveCharge(LoanPayment payment, EmiSchedule emi,
+                            ChargeType type, BigDecimal amount, int daysLate, LocalDate today) {
+
+        if (penaltyRepo.existsByEmiScheduleIdAndChargeType(
+                emi.getEmiScheduleId(), type)) {
+            return;
+        }
+
+        PenaltyCharge charge = new PenaltyCharge();
+        charge.setLoanAccountId(payment.getLoanAccountId());
+        charge.setEmiScheduleId(emi.getEmiScheduleId());
+        charge.setChargeType(type);
+        charge.setAmount(amount);
+        charge.setChargeDate(today);
+        charge.setDaysLate(daysLate);
+        charge.setPaymentId(payment.getPaymentId());
+        penaltyRepo.save(charge);
+    }
 
     @Override
     @Transactional(readOnly = true)
     public PaymentResponse getPayment(Integer paymentId) {
 
         if (paymentId == null || paymentId <= 0) {
-            throw new InvalidPaymentException(
-                    "Valid payment ID is required");
+            throw new InvalidPaymentException("Valid payment ID is required");
         }
 
         LoanPayment payment = paymentRepo.findById(paymentId)
@@ -368,18 +273,12 @@ public class PaymentServiceImpl implements PaymentService {
         return mapper.map(payment, PaymentResponse.class);
     }
 
-    // =========================================================
-    // PAYMENT HISTORY
-    // =========================================================
-
     @Override
     @Transactional(readOnly = true)
-    public List<PaymentResponse> getPaymentHistory(
-            Integer loanAccountId) {
+    public List<PaymentResponse> getPaymentHistory(Integer loanAccountId) {
 
         if (loanAccountId == null || loanAccountId <= 0) {
-            throw new InvalidPaymentException(
-                    "Valid loan account ID is required");
+            throw new InvalidPaymentException("Valid loan account ID is required");
         }
 
         List<PaymentResponse> history = paymentRepo
@@ -389,48 +288,34 @@ public class PaymentServiceImpl implements PaymentService {
                 .map(p -> mapper.map(p, PaymentResponse.class))
                 .toList();
 
-        log.info(
-                "Payment history fetched. loanAccountId={}, successfulPayments={}",
+        log.info("Payment history fetched. loanAccountId={}, count={}",
                 loanAccountId, history.size());
 
         return history;
     }
 
-    // =========================================================
-    // PAYMENT BREAKUP
-    // =========================================================
     @Override
     @Transactional(readOnly = true)
     public PaymentBreakupResponse getPaymentBreakup(Integer emiScheduleId) {
 
         EmiSchedule emi = getEmi(emiScheduleId);
-
         int daysLate = getDaysLate(emi);
 
-        BigDecimal penalty = BigDecimal.valueOf(daysLate);
-        BigDecimal bonus = calculateBonus(emi, daysLate);
-
-        PaymentBreakupResponse response =
-                mapper.map(emi, PaymentBreakupResponse.class);
-
-        response.setPenaltyAmount(penalty);
-        response.setBonusAmount(bonus);
+        PaymentBreakupResponse response = mapper.map(emi, PaymentBreakupResponse.class);
+        response.setPenaltyAmount(BigDecimal.valueOf(daysLate));
+        response.setBonusAmount(calculateBonus(emi, daysLate));
         response.setDaysLate(daysLate);
-        response.setTotalAmount(
-                emi.getEmiAmount().add(penalty).add(bonus));
+        response.setTotalAmount(emi.getEmiAmount()
+                .add(response.getPenaltyAmount())
+                .add(response.getBonusAmount()));
 
         return response;
     }
 
-    // =========================================================
-    // GET EMI
-    // =========================================================
-
     private EmiSchedule getEmi(Integer id) {
 
         if (id == null || id <= 0) {
-            throw new InvalidPaymentException(
-                    "Valid EMI schedule ID is required");
+            throw new InvalidPaymentException("Valid EMI schedule ID is required");
         }
 
         return emiRepo.findById(id)
@@ -438,15 +323,10 @@ public class PaymentServiceImpl implements PaymentService {
                         "EMI schedule not found: " + id));
     }
 
-    // =========================================================
-    // GET CURRENT DUE EMI
-    // =========================================================
-
     private EmiSchedule getCurrentDueEmi(Integer loanAccountId) {
 
         LocalDate today = LocalDate.now();
-
-        LocalDate monthStart = today.withDayOfMonth(1);
+        YearMonth currentMonth = YearMonth.from(today);
 
         return emiRepo
                 .findByLoanAccountIdAndStatusOrderByInstallmentNoAsc(
@@ -454,46 +334,30 @@ public class PaymentServiceImpl implements PaymentService {
                 .stream()
                 .filter(emi -> emi.getDueDate() != null)
                 .filter(emi -> !emi.getDueDate().isAfter(today)
-                        || !YearMonth.from(emi.getDueDate())
-                        .isAfter(YearMonth.from(monthStart)))
+                        || !YearMonth.from(emi.getDueDate()).isAfter(currentMonth))
                 .findFirst()
                 .orElseThrow(() -> new EmiNotFoundException(
                         "No EMI is currently available for payment"));
     }
-    // =========================================================
-    // CALCULATE LATE DAYS
-    // =========================================================
 
     private int getDaysLate(EmiSchedule emi) {
 
-        LocalDate dueDate = emi.getDueDate();
-
-        if (dueDate == null) {
-            throw new InvalidPaymentException(
-                    "EMI due date is missing");
+        if (emi.getDueDate() == null) {
+            throw new InvalidPaymentException("EMI due date is missing");
         }
 
         LocalDate today = LocalDate.now();
-
-        if (today.isAfter(dueDate)) {
-            return Math.toIntExact(
-                    ChronoUnit.DAYS.between(dueDate, today));
-        }
-
-        return 0;
+        return today.isAfter(emi.getDueDate())
+                ? Math.toIntExact(ChronoUnit.DAYS.between(emi.getDueDate(), today))
+                : 0;
     }
-
-    // =========================================================
-    // INVOICE
-    // =========================================================
 
     @Override
     @Transactional(readOnly = true)
     public PaymentBreakupResponse getInvoice(Integer paymentId) {
 
         if (paymentId == null || paymentId <= 0) {
-            throw new InvalidPaymentException(
-                    "Valid payment ID is required");
+            throw new InvalidPaymentException("Valid payment ID is required");
         }
 
         LoanPayment payment = paymentRepo.findById(paymentId)
@@ -511,15 +375,13 @@ public class PaymentServiceImpl implements PaymentService {
     private BigDecimal calculateBonus(EmiSchedule emi, int daysLate) {
 
         if (daysLate <= 0) {
-            return BigDecimal.ZERO;
+            return ZERO;
         }
 
         long lateMonths = ChronoUnit.MONTHS.between(
                 YearMonth.from(emi.getDueDate()),
-                YearMonth.from(LocalDate.now())
-        );
+                YearMonth.from(LocalDate.now()));
 
         return BigDecimal.valueOf(Math.max(0, lateMonths) * 500);
     }
-
 }
