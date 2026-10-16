@@ -19,4 +19,8 @@ public class PenaltyResponse {
     private BigDecimal amount;
     private LocalDate chargeDate;
     private Integer daysLate;
+
+    // Calculated totals for My Penalties page
+    private BigDecimal penaltyAmount;
+    private BigDecimal bonusAmount;
 }

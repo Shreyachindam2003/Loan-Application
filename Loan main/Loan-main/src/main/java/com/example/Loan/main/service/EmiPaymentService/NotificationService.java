@@ -1,33 +1,14 @@
 package com.example.Loan.main.service.EmiPaymentService;
 
-
-import com.example.Loan.main.dto.EmiPaymentDto.response.NotificationResponse;
-
 import java.util.List;
 
+import com.example.Loan.main.dto.EmiPaymentDto.response.NotificationResponse;
 
 public interface NotificationService {
 
     List<NotificationResponse> getNotifications(Integer customerId);
 
-    List<NotificationResponse> getUnreadNotifications(Integer customerId);
-
     void markAsRead(Integer notificationId);
-
-    void markAllAsRead(Integer customerId);
-
-    void createNotification(
-            Integer customerId,
-            String title,
-            String message,
-            String notificationType,
-            Integer referenceId);
-
-    void sendEmail(
-            String email,
-            String subject,
-            String message);
-
 
     boolean createEmiReminder(
             Integer customerId,
@@ -35,4 +16,11 @@ public interface NotificationService {
             String message,
             Integer emiScheduleId);
 
+    boolean createOverdueWarning(
+            Integer customerId,
+            String title,
+            String message,
+            Integer emiScheduleId);
+
+    List<NotificationResponse> getUnreadNotifications(Integer customerId);
 }

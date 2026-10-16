@@ -4,6 +4,7 @@ package com.example.Loan.main.serviceImpl.EmiPaymentServiceImpl;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
@@ -62,13 +63,10 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         EmiSchedule emi = getCurrentDueEmi(loanAccountId);
+
         int daysLate = getDaysLate(emi);
-
-        BigDecimal penalty = daysLate > 0
-                ? BigDecimal.valueOf(daysLate)
-                : BigDecimal.ZERO;
-
-        BigDecimal bonus = BigDecimal.ZERO;
+        BigDecimal penalty = BigDecimal.valueOf(daysLate);
+        BigDecimal bonus = calculateBonus(emi, daysLate);
 
         CurrentEmiResponse response =
                 mapper.map(emi, CurrentEmiResponse.class);
@@ -79,10 +77,6 @@ public class PaymentServiceImpl implements PaymentService {
         response.setBonusAmount(bonus);
         response.setTotalPayable(
                 emi.getEmiAmount().add(penalty).add(bonus));
-
-        log.info(
-                "Current due EMI fetched. loanAccountId={}, emiScheduleId={}",
-                loanAccountId, emi.getEmiScheduleId());
 
         return response;
     }
@@ -309,22 +303,29 @@ public class PaymentServiceImpl implements PaymentService {
                 penaltyRepo.save(penalty);
             }
 
-            boolean bonusExists = penaltyRepo
-                    .existsByEmiScheduleIdAndChargeType(
-                            emi.getEmiScheduleId(), ChargeType.BONUS);
 
-            if (!bonusExists) {
-                PenaltyCharge bonus = new PenaltyCharge();
-                bonus.setLoanAccountId(payment.getLoanAccountId());
-                bonus.setEmiScheduleId(emi.getEmiScheduleId());
-                bonus.setChargeType(ChargeType.BONUS);
-                bonus.setAmount(BigDecimal.valueOf(500));
-                bonus.setChargeDate(today);
-                bonus.setDaysLate(daysLate);
-                bonus.setPaymentId(payment.getPaymentId());
+            BigDecimal bonusAmount = calculateBonus(emi, daysLate);
 
-                penaltyRepo.save(bonus);
+            if (bonusAmount.compareTo(BigDecimal.ZERO) > 0) {
+
+                boolean bonusExists = penaltyRepo
+                        .existsByEmiScheduleIdAndChargeType(
+                                emi.getEmiScheduleId(), ChargeType.BONUS);
+
+                if (!bonusExists) {
+                    PenaltyCharge bonus = new PenaltyCharge();
+                    bonus.setLoanAccountId(payment.getLoanAccountId());
+                    bonus.setEmiScheduleId(emi.getEmiScheduleId());
+                    bonus.setChargeType(ChargeType.BONUS);
+                    bonus.setAmount(bonusAmount);
+                    bonus.setChargeDate(today);
+                    bonus.setDaysLate(daysLate);
+                    bonus.setPaymentId(payment.getPaymentId());
+
+                    penaltyRepo.save(bonus);
+                }
             }
+
         }
 
         payment.setRazorpayPaymentId(req.getRazorpayPaymentId());
@@ -398,35 +399,23 @@ public class PaymentServiceImpl implements PaymentService {
     // =========================================================
     // PAYMENT BREAKUP
     // =========================================================
-
     @Override
     @Transactional(readOnly = true)
-    public PaymentBreakupResponse getPaymentBreakup(
-            Integer emiScheduleId) {
+    public PaymentBreakupResponse getPaymentBreakup(Integer emiScheduleId) {
 
         EmiSchedule emi = getEmi(emiScheduleId);
 
-        List<PenaltyCharge> charges =
-                penaltyRepo.findByEmiScheduleId(emiScheduleId);
+        int daysLate = getDaysLate(emi);
 
-        BigDecimal penalty = charges.stream()
-                .filter(c -> c.getChargeType() == ChargeType.PENALTY)
-                .map(PenaltyCharge::getAmount)
-                .filter(amount -> amount != null)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal bonus = charges.stream()
-                .filter(c -> c.getChargeType() == ChargeType.BONUS)
-                .map(PenaltyCharge::getAmount)
-                .filter(amount -> amount != null)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal penalty = BigDecimal.valueOf(daysLate);
+        BigDecimal bonus = calculateBonus(emi, daysLate);
 
         PaymentBreakupResponse response =
                 mapper.map(emi, PaymentBreakupResponse.class);
 
         response.setPenaltyAmount(penalty);
         response.setBonusAmount(bonus);
-        response.setDaysLate(getDaysLate(emi));
+        response.setDaysLate(daysLate);
         response.setTotalAmount(
                 emi.getEmiAmount().add(penalty).add(bonus));
 
@@ -455,22 +444,22 @@ public class PaymentServiceImpl implements PaymentService {
 
     private EmiSchedule getCurrentDueEmi(Integer loanAccountId) {
 
-        if (loanAccountId == null || loanAccountId <= 0) {
-            throw new InvalidPaymentException(
-                    "Valid loan account ID is required");
-        }
+        LocalDate today = LocalDate.now();
+
+        LocalDate monthStart = today.withDayOfMonth(1);
 
         return emiRepo
-                .findByLoanAccountIdAndStatusAndDueDateLessThanEqualOrderByInstallmentNoAsc(
-                        loanAccountId,
-                        EmiStatus.PENDING,
-                        LocalDate.now())
+                .findByLoanAccountIdAndStatusOrderByInstallmentNoAsc(
+                        loanAccountId, EmiStatus.PENDING)
                 .stream()
-                .min(Comparator.comparing(EmiSchedule::getInstallmentNo))
+                .filter(emi -> emi.getDueDate() != null)
+                .filter(emi -> !emi.getDueDate().isAfter(today)
+                        || !YearMonth.from(emi.getDueDate())
+                        .isAfter(YearMonth.from(monthStart)))
+                .findFirst()
                 .orElseThrow(() -> new EmiNotFoundException(
-                        "No EMI is currently due for payment"));
+                        "No EMI is currently available for payment"));
     }
-
     // =========================================================
     // CALCULATE LATE DAYS
     // =========================================================
@@ -518,4 +507,19 @@ public class PaymentServiceImpl implements PaymentService {
 
         return getPaymentBreakup(payment.getEmiScheduleId());
     }
+
+    private BigDecimal calculateBonus(EmiSchedule emi, int daysLate) {
+
+        if (daysLate <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        long lateMonths = ChronoUnit.MONTHS.between(
+                YearMonth.from(emi.getDueDate()),
+                YearMonth.from(LocalDate.now())
+        );
+
+        return BigDecimal.valueOf(Math.max(0, lateMonths) * 500);
+    }
+
 }

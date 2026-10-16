@@ -35,4 +35,8 @@ public interface EmiScheduleRepository
             Integer loanAccountId,
             EmiStatus status,
             LocalDate dueDate);
+
+
+    List<EmiSchedule> findByLoanAccountIdAndStatusOrderByInstallmentNoAsc(
+            Integer loanAccountId, EmiStatus status);
 }

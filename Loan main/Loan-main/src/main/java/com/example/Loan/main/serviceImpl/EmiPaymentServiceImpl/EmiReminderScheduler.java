@@ -1,8 +1,10 @@
-
 package com.example.Loan.main.serviceImpl.EmiPaymentServiceImpl;
 
 import java.time.LocalDate;
 import java.util.List;
+
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
 
 import com.example.Loan.main.entity.Customer;
 import com.example.Loan.main.entity.EmiPaymentEntity.EmiSchedule;
@@ -11,16 +13,11 @@ import com.example.Loan.main.exception.EmiReminderException;
 import com.example.Loan.main.respository.CustomerRepository;
 import com.example.Loan.main.respository.EmiPaymentRepo.EmiScheduleRepository;
 import com.example.Loan.main.respository.LoanAccountRepository;
-
 import com.example.Loan.main.service.EmiPaymentService.EmailService;
 import com.example.Loan.main.service.EmiPaymentService.NotificationService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import org.springframework.dao.DataAccessException;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
@@ -29,121 +26,122 @@ public class EmiReminderScheduler {
 
     private final EmiScheduleRepository emiRepo;
     private final LoanAccountRepository accountRepo;
-    private final CustomerRepository customerRepository;
+    private final CustomerRepository customerRepo;
     private final NotificationService notificationService;
     private final EmailService emailService;
 
-    @Scheduled(cron = "0 0 9 * * *")
+    // Run every day at 9 AM
+//    @Scheduled(cron = "0 0 9 * * *")
+    @Scheduled(cron = "0 * * * * *")
     public void sendEmiReminders() {
 
-        log.info("EMI reminder scheduler started");
-
-        List<EmiSchedule> emis;
-
-        try {
-            emis = emiRepo.findByStatus(EmiStatus.PENDING);
-        } catch (DataAccessException ex) {
-            log.error("Database error while fetching pending EMIs", ex);
-            throw new EmiReminderException(
-                    "Unable to fetch pending EMI schedules", ex);
-        }
-
         LocalDate today = LocalDate.now();
-        int successCount = 0;
-        int failureCount = 0;
+        List<EmiSchedule> emis = emiRepo.findByStatus(EmiStatus.PENDING);
 
         for (EmiSchedule emi : emis) {
+            LocalDate dueDate = emi.getDueDate();
+
+            if (dueDate == null) {
+                continue;
+            }
+
             try {
-                LocalDate dueDate = emi.getDueDate();
+                Integer customerId = accountRepo
+                        .findById(emi.getLoanAccountId())
+                        .map(account -> account.getCustomerId())
+                        .orElseThrow(() ->
+                                new EmiReminderException("Loan account not found"));
 
-                if (dueDate == null) {
-                    throw new EmiReminderException(
-                            "Due date missing for EMI ID: "
-                                    + emi.getEmiScheduleId());
-                }
+                Customer customer = customerRepo.findById(customerId)
+                        .orElseThrow(() ->
+                                new EmiReminderException("Customer not found"));
 
-                // Reminder exactly 3 days before EMI due date
-                if (!dueDate.equals(today.plusDays(3))) {
+                String email = customer.getEmail();
+
+                // 1. EMI overdue for more than 3 months
+                if (today.isAfter(dueDate.plusMonths(3))) {
+
+                    String title = "Overdue EMI Warning";
+
+                    String message = "Your EMI of Rs. " + emi.getEmiAmount()
+                            + " was due on " + dueDate
+                            + " and remains unpaid for more than 3 months. "
+                            + "Please contact our support team to discuss repayment. "
+                            + "An authorised representative visit may be considered "
+                            + "in accordance with applicable law and recovery policy.";
+
+                    boolean created = notificationService.createOverdueWarning(
+                            customerId,
+                            title,
+                            message,
+                            emi.getEmiScheduleId());
+
+                    if (created) {
+                        if (email == null || email.isBlank()) {
+                            log.warn("Customer email is missing for customer ID: {}",
+                                    customerId);
+                        } else {
+                            emailService.sendEmail(
+                                    email,
+                                    "Important: Overdue EMI Payment Warning",
+                                    "Dear Customer,\n\n"
+                                            + message + "\n\n"
+                                            + "Please contact our support team to discuss "
+                                            + "your repayment options.\n\n"
+                                            + "Regards,\nLoan Management Team");
+                        }
+                    }
+
                     continue;
                 }
 
-                Integer customerId = getCustomerId(
-                        emi.getLoanAccountId());
+                // 2. Normal reminder: before due date or monthly while unpaid
+                if (today.isBefore(dueDate.minusDays(3))) {
+                    continue;
+                }
 
-                Customer customer = customerRepository
-                        .findById(customerId)
-                        .orElseThrow(() ->
-                                new EmiReminderException(
-                                        "Customer not found. Customer ID: "
-                                                + customerId));
+                if (today.isAfter(dueDate)) {
+                    // Send a reminder on the same day number every month
+                    if (today.getDayOfMonth() != dueDate.getDayOfMonth()) {
+                        continue;
+                    }
+                }
+                String notificationMessage = "Your EMI of Rs. "
+                        + emi.getEmiAmount()
+                        + " is due on " + dueDate
+                        + ". Please pay on time.";
 
-                String message =
-                        "Your EMI of Rs. " + emi.getEmiAmount()
-                                + " is due on " + dueDate
-                                + ". Please pay before the due date.";
+                String emailMessage = "Dear Customer,\n\n"
+                        + "This is a friendly reminder that your EMI payment "
+                        + "of Rs. " + emi.getEmiAmount()
+                        + " is due on " + dueDate + ".\n\n"
+                        + "Please make your payment on or before the due date "
+                        + "to avoid additional penalties.\n\n"
+                        + "Regards,\nLoan Management Team";
 
-                // Create in-app reminder with duplicate prevention
                 boolean created = notificationService.createEmiReminder(
                         customerId,
                         "EMI Payment Reminder",
-                        message,
+                        notificationMessage,
                         emi.getEmiScheduleId());
 
-                // Send email only when a new reminder is created
                 if (created) {
-                    emailService.sendEmail(
-                            customer.getEmail(),
-                            "EMI Payment Reminder",
-                            "Dear Customer,\n\n"
-                                    + message
-                                    + "\n\nRegards,\n"
-                                    + "Loan Management Team");
-
-                    successCount++;
-
-                    log.info(
-                            "EMI reminder created. EMI ID: {}, Loan Account ID: {}, Customer ID: {}",
-                            emi.getEmiScheduleId(),
-                            emi.getLoanAccountId(),
-                            customerId);
-                } else {
-                    log.info(
-                            "Duplicate reminder skipped for EMI ID: {}",
-                            emi.getEmiScheduleId());
+                    if (email == null || email.isBlank()) {
+                        log.warn("Customer email is missing for customer ID: {}",
+                                customerId);
+                    } else {
+                        emailService.sendEmail(
+                                email,
+                                "EMI Payment Reminder - Loan Management",
+                                emailMessage);
+                    }
                 }
 
-            } catch (EmiReminderException ex) {
-                failureCount++;
-                log.error(
-                        "EMI reminder processing failed. EMI ID: {}, Reason: {}",
-                        emi.getEmiScheduleId(),
-                        ex.getMessage(), ex);
-
-            } catch (DataAccessException ex) {
-                failureCount++;
-                log.error(
-                        "Database error while processing EMI ID: {}",
-                        emi.getEmiScheduleId(), ex);
-
             } catch (RuntimeException ex) {
-                failureCount++;
-                log.error(
-                        "Reminder or email sending failed for EMI ID: {}",
+                log.error("Reminder failed for EMI ID: {}",
                         emi.getEmiScheduleId(), ex);
             }
         }
-
-        log.info(
-                "EMI reminder scheduler completed. Total pending EMIs: {}, Reminders created: {}, Failed: {}",
-                emis.size(), successCount, failureCount);
     }
 
-    private Integer getCustomerId(Integer loanAccountId) {
-
-        return accountRepo.findById(loanAccountId)
-                .map(account -> account.getCustomerId())
-                .orElseThrow(() -> new EmiReminderException(
-                        "Loan account not found. Loan Account ID: "
-                                + loanAccountId));
-    }
 }
