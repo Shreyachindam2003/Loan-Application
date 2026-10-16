@@ -95,7 +95,7 @@ public class EmiReminderScheduler {
                     continue;
                 }
 
-                // 2. Normal reminder: before due date or monthly while unpaid
+                /*// 2. Normal reminder: before due date or monthly while unpaid
                 if (today.isBefore(dueDate.minusDays(3))) {
                     continue;
                 }
@@ -105,7 +105,13 @@ public class EmiReminderScheduler {
                     if (today.getDayOfMonth() != dueDate.getDayOfMonth()) {
                         continue;
                     }
+                }*/
+
+                // Testing: create reminder for pending EMIs whose due date has arrived
+                if (today.isBefore(dueDate.minusDays(3))) {
+                    continue;
                 }
+
                 String notificationMessage = "Your EMI of Rs. "
                         + emi.getEmiAmount()
                         + " is due on " + dueDate
@@ -125,7 +131,7 @@ public class EmiReminderScheduler {
                         notificationMessage,
                         emi.getEmiScheduleId());
 
-                if (created) {
+                /*if (created) {
                     if (email == null || email.isBlank()) {
                         log.warn("Customer email is missing for customer ID: {}",
                                 customerId);
@@ -135,6 +141,14 @@ public class EmiReminderScheduler {
                                 "EMI Payment Reminder - Loan Management",
                                 emailMessage);
                     }
+                }*/
+
+                if (created && email != null && !email.isBlank()) {
+                    emailService.sendEmail(
+                            email,
+                            "EMI Payment Reminder - Loan Management",
+                            emailMessage
+                    );
                 }
 
             } catch (RuntimeException ex) {
