@@ -1,12 +1,16 @@
 package com.example.Loan.main.serviceImpl.loandealcreation;
 
-import com.example.Loan.main.config.loandealcreation.ModelMapperConfig.DisbursementData;
+import com.example.Loan.main.config.loandealcreation.ModelMapperConfig;
 import com.example.Loan.main.dto.loandealcreation.request.DisbursementRequest;
+import com.example.Loan.main.dto.loandealcreation.response.DisbursementDetailsResponse;
 import com.example.Loan.main.dto.loandealcreation.response.DisbursementResponse;
 import com.example.Loan.main.dto.loandealcreation.response.LoanAccountResponse;
-import com.example.Loan.main.entity.loandealcreation.*;
-
-import com.example.Loan.main.enums.LoanApplicationStatus;
+import com.example.Loan.main.dto.loandealcreation.response.PageResponse;
+import com.example.Loan.main.entity.loandealcreation.Disbursement;
+import com.example.Loan.main.entity.loandealcreation.LoanAccount;
+import com.example.Loan.main.entity.loandealcreation.LoanDeal;
+import com.example.Loan.main.entity.loandealcreation.SanctionLetter;
+import com.example.Loan.main.enums.loandealcreation.LoanApplicationStatus;
 import com.example.Loan.main.exception.loandealcreation.BusinessException;
 import com.example.Loan.main.exception.loandealcreation.ResourceNotFoundException;
 import com.example.Loan.main.respository.loandealcreation.DisbursementRepository;
@@ -17,6 +21,8 @@ import com.example.Loan.main.service.loandealcreation.DisbursementService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -138,13 +144,65 @@ public class DisbursementServiceImpl implements DisbursementService {
 
     @Override
     @Transactional(readOnly = true)
+    public DisbursementDetailsResponse getDisbursementById(
+            Integer disbursementId
+    ) {
+        Disbursement disbursement = repo.findById(disbursementId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Disbursement not found"
+                ));
+
+        return details(disbursement);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DisbursementDetailsResponse getLatestDisbursementByDealId(
+            Integer dealId
+    ) {
+        Disbursement disbursement = repo
+                .findFirstByDealIdOrderByDisbursementDateDescDisbursementIdDesc(
+                        dealId
+                )
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Disbursement not found for this application"
+                ));
+
+        return details(disbursement);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<DisbursementDetailsResponse> getDealDisbursements(
+            Integer dealId,
+            int page,
+            int size
+    ) {
+        PageRequest pageable = PaginationSupport.page(
+                page,
+                size,
+                "disbursementDate",
+                "disbursementId"
+        );
+
+        checkDeal(dealId);
+
+        Page<DisbursementDetailsResponse> result = repo
+                .findByDealId(dealId, pageable)
+                .map(this::details);
+
+        return PageResponse.from(result);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public LoanAccountResponse getAccount(Integer loanAccountId) {
         LoanAccount account = accountRepo.findById(loanAccountId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Loan account not found"
                 ));
 
-        return modelMapper.map(account, LoanAccountResponse.class);
+        return accountResponse(account);
     }
 
     @Override
@@ -154,11 +212,64 @@ public class DisbursementServiceImpl implements DisbursementService {
     ) {
         return accountRepo.findByCustomerIdOrderByCreatedAtDesc(customerId)
                 .stream()
-                .map(account -> modelMapper.map(
-                        account,
-                        LoanAccountResponse.class
-                ))
+                .map(this::accountResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public LoanAccountResponse getAccountByDealId(Integer dealId) {
+        LoanAccount account = accountRepo.findByDealId(dealId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Loan account not found for this application"
+                ));
+
+        return accountResponse(account);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public LoanAccountResponse getLatestAccountByCustomerId(
+            Integer customerId
+    ) {
+        LoanAccount account = accountRepo
+                .findFirstByCustomerIdOrderByCreatedAtDescLoanAccountIdDesc(
+                        customerId
+                )
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer loan account not found"
+                ));
+
+        return accountResponse(account);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<LoanAccountResponse> getCustomerAccountPage(
+            Integer customerId,
+            int page,
+            int size
+    ) {
+        PageRequest pageable = PaginationSupport.page(
+                page,
+                size,
+                "createdAt",
+                "loanAccountId"
+        );
+
+        Page<LoanAccountResponse> result = accountRepo
+                .findByCustomerId(customerId, pageable)
+                .map(this::accountResponse);
+
+        return PageResponse.from(result);
+    }
+
+    private void checkDeal(Integer dealId) {
+        if (!dealRepo.existsById(dealId)) {
+            throw new ResourceNotFoundException(
+                    "Loan application not found"
+            );
+        }
     }
 
     private void validate(
@@ -225,13 +336,53 @@ public class DisbursementServiceImpl implements DisbursementService {
         }
     }
 
+
+    private LoanAccountResponse accountResponse(LoanAccount account) {
+        return new LoanAccountResponse(
+                account.getLoanAccountId(),
+                account.getLoanAccountNo(),
+                account.getCustomerId(),
+                account.getDealId(),
+                account.getLoanAmount(),
+                account.getOutstandingPrincipal(),
+                account.getInterestRate(),
+                account.getTenureMonths(),
+                account.getEmiAmount(),
+                account.getTotalPaidAmount(),
+                account.getLoanStatus(),
+                account.getDisbursementDate()
+        );
+    }
+
+
+    private DisbursementDetailsResponse details(
+            Disbursement disbursement
+    ) {
+        return new DisbursementDetailsResponse(
+                disbursement.getDisbursementId(),
+                disbursement.getDealId(),
+                disbursement.getDisburseAmount(),
+                disbursement.getBankPartner(),
+                disbursement.getStatus(),
+                disbursement.getDisbursementDate()
+        );
+    }
+
+
     private DisbursementResponse response(
             Disbursement disbursement,
             LoanAccount account
     ) {
-        return modelMapper.map(
-                new DisbursementData(disbursement, account),
-                DisbursementResponse.class
+        return new DisbursementResponse(
+                disbursement.getDisbursementId(),
+                disbursement.getDealId(),
+                disbursement.getDisburseAmount(),
+                disbursement.getBankPartner(),
+                disbursement.getStatus(),
+                simulationEnabled,
+                disbursement.getDisbursementDate(),
+                accountResponse(account)
         );
     }
+
 }

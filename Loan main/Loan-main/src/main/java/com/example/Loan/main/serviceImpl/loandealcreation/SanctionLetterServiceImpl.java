@@ -3,12 +3,10 @@ package com.example.Loan.main.serviceImpl.loandealcreation;
 import com.example.Loan.main.dto.loandealcreation.response.SanctionLetterResponse;
 import com.example.Loan.main.entity.loandealcreation.LoanDeal;
 import com.example.Loan.main.entity.loandealcreation.SanctionLetter;
-
-import com.example.Loan.main.enums.LoanApplicationStatus;
+import com.example.Loan.main.enums.loandealcreation.LoanApplicationStatus;
 import com.example.Loan.main.enums.loandealcreation.LoanType;
 import com.example.Loan.main.exception.loandealcreation.BusinessException;
 import com.example.Loan.main.exception.loandealcreation.ResourceNotFoundException;
-
 import com.example.Loan.main.respository.loandealcreation.LoanDealRepository;
 import com.example.Loan.main.respository.loandealcreation.SanctionLetterRepository;
 import com.example.Loan.main.service.loandealcreation.SanctionLetterService;
@@ -76,10 +74,7 @@ public class SanctionLetterServiceImpl
                 dealRepo.save(deal);
             }
 
-            return modelMapper.map(
-                    existing,
-                    SanctionLetterResponse.class
-            );
+            return response(existing);
         }
 
         if (deal.getStatus() != LoanApplicationStatus.APPROVED) {
@@ -186,27 +181,31 @@ public class SanctionLetterServiceImpl
         deal.setStatus(LoanApplicationStatus.SANCTIONED);
         dealRepo.save(deal);
 
-        return modelMapper.map(
-                savedLetter,
-                SanctionLetterResponse.class
-        );
+        return response(savedLetter);
     }
 
     @Override
     @Transactional(readOnly = true)
     public SanctionLetterResponse getById(Integer sanctionId) {
-        return modelMapper.map(
-                findLetter(sanctionId),
-                SanctionLetterResponse.class
-        );
+        return response(findLetter(sanctionId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SanctionLetterResponse getByDealId(Integer dealId) {
+        SanctionLetter letter = repo.findByDealId(dealId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Sanction letter not found for this application"
+                ));
+
+        return response(letter);
     }
 
     @Override
     @Transactional(readOnly = true)
     public byte[] downloadPdf(Integer sanctionId) {
-        SanctionLetterResponse letter = modelMapper.map(
-                findLetter(sanctionId),
-                SanctionLetterResponse.class
+        SanctionLetterResponse letter = response(
+                findLetter(sanctionId)
         );
 
         List<String> lines = new ArrayList<>();
@@ -223,8 +222,7 @@ public class SanctionLetterServiceImpl
                 + value(letter.annualInterestRate()) + "%");
         lines.add("Tenure: "
                 + value(letter.tenureMonths()) + " months");
-        lines.add("Monthly EMI: INR "
-                + value(letter.emiAmount()));
+        lines.add("Monthly EMI: INR " + value(letter.emiAmount()));
         lines.add("Processing Charge: "
                 + value(letter.processingChargePercent()) + "%");
         lines.add("Processing Amount: INR "
@@ -256,6 +254,50 @@ public class SanctionLetterServiceImpl
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Sanction letter not found"
                 ));
+    }
+
+    private SanctionLetterResponse response(SanctionLetter letter) {
+
+        LocalDateTime issuedAt = letter.getCreatedAt();
+
+        LocalDateTime validUntil =
+                issuedAt != null && letter.getValidityDays() != null
+                        ? issuedAt.plusDays(letter.getValidityDays())
+                        : null;
+
+        List<String> additionalConditions =
+                letter.getAdditionalConditions() == null
+                        || letter.getAdditionalConditions().isBlank()
+                        ? List.of()
+                        : letter.getAdditionalConditions()
+                        .lines()
+                        .map(String::trim)
+                        .filter(condition -> !condition.isBlank())
+                        .toList();
+
+        return new SanctionLetterResponse(
+                letter.getSanctionId(),
+                "SAN-" + String.format("%08d", letter.getSanctionId()),
+                letter.getDealId(),
+                "APP-" + letter.getDealId(),
+                letter.getApplicantName(),
+                letter.getMobileNo(),
+                letter.getLoanType(),
+                letter.getLoanAmount(),
+                letter.getInterestRate(),
+                letter.getTenureMonths(),
+                letter.getEmiAmount(),
+                letter.getProcessingChargePercent(),
+                letter.getProcessingChargeAmount(),
+                letter.getOriginationFee(),
+                letter.getValidityDays(),
+                issuedAt,
+                validUntil,
+                letter.getPropertyAddress(),
+                letter.getIssuingBank(),
+                additionalConditions,
+                letter.getAuthorizedSignatory()
+        );
     }
 
     private String value(Object value) {

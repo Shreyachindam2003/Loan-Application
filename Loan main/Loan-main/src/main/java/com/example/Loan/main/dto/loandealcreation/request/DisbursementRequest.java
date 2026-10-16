@@ -7,7 +7,7 @@ public record DisbursementRequest(
         @NotNull(message = "Bank partner is required")
         BankPartner bankPartner
 ) {
-    //dada
+
     public enum BankPartner {
         SBI,
         HDFC,

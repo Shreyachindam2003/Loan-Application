@@ -3,7 +3,7 @@ package com.example.Loan.main.dto.loandealcreation.response;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-//dada
+
 public record SanctionLetterResponse(
         Integer sanctionId,
         String sanctionNumber,

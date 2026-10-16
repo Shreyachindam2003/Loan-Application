@@ -10,7 +10,13 @@ import java.util.Optional;
 public interface ScoreCardRepository
         extends JpaRepository<ScoreCard, Integer> {
 
-    Optional<ScoreCard> findByEligibilityId(Integer eligibilityId);
+    Optional<ScoreCard> findByEligibilityId(
+            Integer eligibilityId
+    );
+
+    Optional<ScoreCard> findFirstByCustomerIdOrderByAppliedDateDescScoreCardIdDesc(
+            Integer customerId
+    );
 
     @Query(
             value = """
@@ -20,7 +26,8 @@ public interface ScoreCardRepository
                         CibilScore AS cibilScore,
                         IsEligible AS eligible,
                         LoanAmount AS loanAmount,
-                        RiskCategory AS riskCategory
+                        RiskCategory AS riskCategory,
+                        ReviewStatus AS reviewStatus
                     FROM EligibilityResults
                     WHERE CustomerId = :customerId
                     ORDER BY EligibilityId DESC
@@ -28,7 +35,7 @@ public interface ScoreCardRepository
                     """,
             nativeQuery = true
     )
-    Optional<com.example.Loan.main.repository.loandealcreation.EligibilityView> findLatestEligibility(
+    Optional<EligibilityView> findLatestEligibility(
             @Param("customerId") Integer customerId
     );
-}//dada
+}

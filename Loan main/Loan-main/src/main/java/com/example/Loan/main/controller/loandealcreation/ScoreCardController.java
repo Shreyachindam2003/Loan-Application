@@ -15,14 +15,14 @@ public class ScoreCardController {
 
     @PostMapping("/customers/{customerId}")
     public ResponseApi<ScoreCardResponse> generate(
-            @PathVariable("customerId") Integer customerId
+            @PathVariable("customerId") Integer customerId  
     ) {
         return ResponseApi.success(
                 "Scorecard ready",
                 service.generate(customerId)
         );
     }
-    //dada
+
     @GetMapping("/{scoreCardId}")
     public ResponseApi<ScoreCardResponse> getById(
             @PathVariable("scoreCardId") Integer scoreCardId
@@ -30,6 +30,16 @@ public class ScoreCardController {
         return ResponseApi.success(
                 "Scorecard fetched successfully",
                 service.getById(scoreCardId)
+        );
+    }
+
+    @GetMapping("/customer/{customerId}/latest")
+    public ResponseApi<ScoreCardResponse> getLatest(
+            @PathVariable("customerId") Integer customerId
+    ) {
+        return ResponseApi.success(
+                "Latest customer scorecard fetched",
+                service.getLatestByCustomerId(customerId)
         );
     }
 }

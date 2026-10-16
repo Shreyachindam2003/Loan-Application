@@ -14,4 +14,4 @@ public interface CustomerNotificationService {
             Integer customerId,
             Integer notificationId
     );
-}//dada
+}

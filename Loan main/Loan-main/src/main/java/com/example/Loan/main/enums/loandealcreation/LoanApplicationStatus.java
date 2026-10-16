@@ -1,4 +1,4 @@
-package com.example.Loan.main.enums;
+package com.example.Loan.main.enums.loandealcreation;
 
 public enum LoanApplicationStatus {
 

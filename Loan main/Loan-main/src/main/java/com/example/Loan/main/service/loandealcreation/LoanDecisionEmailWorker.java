@@ -7,6 +7,8 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -16,6 +18,8 @@ import java.util.List;
         havingValue = "true"
 )
 public class LoanDecisionEmailWorker {
+    private static final Logger log =
+            LoggerFactory.getLogger(LoanDecisionEmailWorker.class);
 
     private final JdbcTemplate jdbc;
     private final JavaMailSender mailSender;
@@ -87,14 +91,23 @@ public class LoanDecisionEmailWorker {
                         """, email.id());
 
             } catch (Exception exception) {
+
+                log.error(
+                        "Email send failed. EmailId={}, Recipient={}, Error={}",
+                        email.id(),
+                        email.recipient(),
+                        exception.getMessage(),
+                        exception
+                );
+
                 jdbc.update("""
-                        UPDATE LoanDecisionEmails
-                        SET Status = 'PENDING',
-                            NextAttemptAt = DATE_ADD(
-                                CURRENT_TIMESTAMP(6), INTERVAL 1 MINUTE
-                            )
-                        WHERE EmailId = ?
-                        """, email.id());
+            UPDATE LoanDecisionEmails
+            SET Status = 'PENDING',
+                NextAttemptAt = DATE_ADD(
+                    CURRENT_TIMESTAMP(6), INTERVAL 1 MINUTE
+                )
+            WHERE EmailId = ?
+            """, email.id());
             }
         }
     }

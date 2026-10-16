@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.List;
 
-@Service
+@Service("cibilEligibilityService")
 @RequiredArgsConstructor
 @Slf4j
 public class EligibilityServiceImpl implements EligibilityService {

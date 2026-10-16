@@ -11,7 +11,7 @@ public record LoanApplyRequest(
         @NotNull(message = "Scorecard ID is required")
         @Positive(message = "Scorecard ID must be positive")
         Integer scoreCardId,
-//dada
+
         @NotNull(message = "Loan type is required")
         LoanType loanType,
 

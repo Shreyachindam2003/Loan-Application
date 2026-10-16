@@ -8,5 +8,7 @@ public interface SanctionLetterService {
 
     SanctionLetterResponse getById(Integer sanctionId);
 
+    SanctionLetterResponse getByDealId(Integer dealId);
+
     byte[] downloadPdf(Integer sanctionId);
-}//dada
+}

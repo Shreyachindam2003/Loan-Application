@@ -1,10 +1,11 @@
+
 package com.example.Loan.main.serviceImpl.loandealcreation;
 
 import com.example.Loan.main.dto.loandealcreation.response.ScoreCardResponse;
 import com.example.Loan.main.entity.loandealcreation.ScoreCard;
 import com.example.Loan.main.exception.loandealcreation.BusinessException;
 import com.example.Loan.main.exception.loandealcreation.ResourceNotFoundException;
-import com.example.Loan.main.repository.loandealcreation.EligibilityView;
+import com.example.Loan.main.respository.loandealcreation.EligibilityView;
 import com.example.Loan.main.respository.loandealcreation.ScoreCardRepository;
 import com.example.Loan.main.service.loandealcreation.ScoreCardService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class ScoreCardServiceImpl implements ScoreCardService {
     @Override
     @Transactional
     public ScoreCardResponse generate(Integer customerId) {
+
         EligibilityView result = repo.findLatestEligibility(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Eligibility result not found"
@@ -32,6 +34,12 @@ public class ScoreCardServiceImpl implements ScoreCardService {
         if (!Boolean.TRUE.equals(result.getEligible())) {
             throw new BusinessException(
                     "Scorecard requires approved eligibility"
+            );
+        }
+
+        if (!"APPROVED".equals(result.getReviewStatus())) {
+            throw new BusinessException(
+                    "Scorecard can only be generated after eligibility approval"
             );
         }
 
@@ -52,6 +60,7 @@ public class ScoreCardServiceImpl implements ScoreCardService {
 
         if (card == null) {
             card = new ScoreCard();
+
             card.setCustomerId(result.getCustomerId());
             card.setEligibilityId(result.getEligibilityId());
             card.setCibilScore(result.getCibilScore());
@@ -63,17 +72,44 @@ public class ScoreCardServiceImpl implements ScoreCardService {
             card = repo.save(card);
         }
 
-        return modelMapper.map(card, ScoreCardResponse.class);
+        return response(card);
     }
 
     @Override
     @Transactional(readOnly = true)
     public ScoreCardResponse getById(Integer scoreCardId) {
+
         ScoreCard card = repo.findById(scoreCardId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Scorecard not found"
                 ));
 
-        return modelMapper.map(card, ScoreCardResponse.class);
+        return response(card);
     }
-}//dada
+
+    @Override
+    @Transactional(readOnly = true)
+    public ScoreCardResponse getLatestByCustomerId(Integer customerId) {
+
+        ScoreCard card = repo
+                .findFirstByCustomerIdOrderByAppliedDateDescScoreCardIdDesc(
+                        customerId
+                )
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer scorecard not found"
+                ));
+
+        return response(card);
+    }
+    private ScoreCardResponse response(ScoreCard card) {
+        return new ScoreCardResponse(
+                card.getScoreCardId(),
+                card.getCustomerId(),
+                card.getRiskCategory(),
+                card.getEligibleLoanAmount(),
+                card.getCibilScore(),
+                card.getCurrentStatus(),
+                card.getAppliedDate()
+        );
+    }
+}

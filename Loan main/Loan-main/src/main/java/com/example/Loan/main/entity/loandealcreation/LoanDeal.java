@@ -1,6 +1,6 @@
 package com.example.Loan.main.entity.loandealcreation;
 
-import com.example.Loan.main.enums.LoanApplicationStatus;
+import com.example.Loan.main.enums.loandealcreation.LoanApplicationStatus;
 import com.example.Loan.main.enums.loandealcreation.LoanType;
 import jakarta.persistence.*;
 import lombok.Getter;

@@ -1,4 +1,4 @@
-package com.example.Loan.main.repository.loandealcreation;
+package com.example.Loan.main.respository.loandealcreation;
 
 import java.math.BigDecimal;
 
@@ -14,5 +14,7 @@ public interface EligibilityView {
 
     BigDecimal getLoanAmount();
 
+    String getReviewStatus();
+    
     String getRiskCategory();
-}//dada
+}

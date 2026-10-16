@@ -1,15 +1,21 @@
+
 package com.example.Loan.main.serviceImpl.loandealcreation;
 
 import com.example.Loan.main.dto.loandealcreation.request.DealDecisionRequest;
+import com.example.Loan.main.dto.loandealcreation.response.DealReviewResponse;
 import com.example.Loan.main.dto.loandealcreation.response.LoanDealResponse;
+import com.example.Loan.main.dto.loandealcreation.response.PageResponse;
 import com.example.Loan.main.entity.loandealcreation.LoanDeal;
-import com.example.Loan.main.enums.LoanApplicationStatus;
+
+import com.example.Loan.main.enums.loandealcreation.LoanApplicationStatus;
 import com.example.Loan.main.exception.loandealcreation.BusinessException;
 import com.example.Loan.main.exception.loandealcreation.ResourceNotFoundException;
+import com.example.Loan.main.respository.loandealcreation.DealReviewRepository;
 import com.example.Loan.main.respository.loandealcreation.LoanDealRepository;
 import com.example.Loan.main.service.loandealcreation.DealReviewService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +28,7 @@ import java.util.List;
 public class DealReviewServiceImpl implements DealReviewService {
 
     private final LoanDealRepository repo;
+    private final DealReviewRepository reviewRepo;
     private final JdbcTemplate jdbc;
     private final ModelMapper modelMapper;
 
@@ -32,6 +39,7 @@ public class DealReviewServiceImpl implements DealReviewService {
             Integer officerId,
             DealDecisionRequest request
     ) {
+
         Integer count = jdbc.queryForObject("""
                 SELECT COUNT(*)
                 FROM Users u
@@ -80,9 +88,7 @@ public class DealReviewServiceImpl implements DealReviewService {
                 || emails.get(0) == null
                 || emails.get(0).isBlank()) {
 
-            throw new BusinessException(
-                    "Customer email is missing"
-            );
+            throw new BusinessException("Customer email is missing");
         }
 
         LoanApplicationStatus status = approved
@@ -160,6 +166,77 @@ public class DealReviewServiceImpl implements DealReviewService {
                 notification
         );
 
-        return modelMapper.map(deal, LoanDealResponse.class);
+        return response(deal);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DealReviewResponse getLatestByDealId(Integer dealId) {
+
+        checkDeal(dealId);
+
+        return reviewRepo.findLatestByDealId(dealId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Loan application review not found"
+                ));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<DealReviewResponse> getDealReviews(
+            Integer dealId,
+            int page,
+            int size
+    ) {
+
+        PageRequest pageable = PaginationSupport.page(page, size);
+
+        checkDeal(dealId);
+
+        return PageResponse.from(
+                reviewRepo.findByDealId(dealId, pageable)
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<DealReviewResponse> getOfficerReviews(
+            Integer officerId,
+            int page,
+            int size
+    ) {
+
+        PageRequest pageable = PaginationSupport.page(page, size);
+
+        return PageResponse.from(
+                reviewRepo.findByOfficerId(officerId, pageable)
+        );
+    }
+
+    private LoanDealResponse response(LoanDeal deal) {
+        return new LoanDealResponse(
+                deal.getDealId(),
+                deal.getCustomerId(),
+                deal.getScoreCardId(),
+                deal.getLoanType(),
+                deal.getLoanAmount(),
+                deal.getEligibleAmountAtApplication(),
+                deal.getInterestRate(),
+                deal.getTenureMonths(),
+                deal.getEmiAmount(),
+                deal.getRequestedDisbursementDate(),
+                deal.getEmiDay(),
+                deal.getStatus(),
+                deal.getCreatedAt()
+        );
+    }
+
+    private void checkDeal(Integer dealId) {
+
+        if (!repo.existsById(dealId)) {
+            throw new ResourceNotFoundException(
+                    "Loan application not found"
+            );
+        }
     }
 }

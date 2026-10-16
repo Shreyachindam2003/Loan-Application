@@ -1,8 +1,10 @@
 package com.example.Loan.main.respository.loandealcreation;
 
 import com.example.Loan.main.entity.loandealcreation.LoanDeal;
-import com.example.Loan.main.enums.LoanApplicationStatus;
+import com.example.Loan.main.enums.loandealcreation.LoanApplicationStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -16,6 +18,20 @@ public interface LoanDealRepository
 
     List<LoanDeal> findByStatusOrderByCreatedAtAsc(
             LoanApplicationStatus status
+    );
+
+    Page<LoanDeal> findByStatus(
+            LoanApplicationStatus status,
+            Pageable pageable
+    );
+
+    Page<LoanDeal> findByCustomerId(
+            Integer customerId,
+            Pageable pageable
+    );
+
+    Optional<LoanDeal> findFirstByCustomerIdOrderByCreatedAtDescDealIdDesc(
+            Integer customerId
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

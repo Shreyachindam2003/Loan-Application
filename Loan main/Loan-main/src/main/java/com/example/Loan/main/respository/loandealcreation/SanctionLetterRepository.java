@@ -8,5 +8,7 @@ import java.util.Optional;
 public interface SanctionLetterRepository
         extends JpaRepository<SanctionLetter, Integer> {
 
-    Optional<SanctionLetter> findByDealId(Integer dealId);
-}//dada
+    Optional<SanctionLetter> findByDealId(
+            Integer dealId
+    );
+}

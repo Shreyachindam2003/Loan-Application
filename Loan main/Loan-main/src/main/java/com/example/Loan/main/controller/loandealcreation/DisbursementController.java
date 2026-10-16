@@ -1,7 +1,9 @@
 package com.example.Loan.main.controller.loandealcreation;
 
 import com.example.Loan.main.dto.loandealcreation.request.DisbursementRequest;
+import com.example.Loan.main.dto.loandealcreation.response.DisbursementDetailsResponse;
 import com.example.Loan.main.dto.loandealcreation.response.DisbursementResponse;
+import com.example.Loan.main.dto.loandealcreation.response.PageResponse;
 import com.example.Loan.main.dto.loandealcreation.response.ResponseApi;
 import com.example.Loan.main.service.loandealcreation.DisbursementService;
 import jakarta.validation.Valid;
@@ -12,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/disbursements")
 @RequiredArgsConstructor
 public class DisbursementController {
-    //dada
+
     private final DisbursementService service;
 
     @PostMapping("/deals/{dealId}")
@@ -23,6 +25,38 @@ public class DisbursementController {
         return ResponseApi.success(
                 "Simulated disbursement completed; loan account ready",
                 service.disburse(dealId, request)
+        );
+    }
+
+    @GetMapping("/{disbursementId}")
+    public ResponseApi<DisbursementDetailsResponse> getById(
+            @PathVariable("disbursementId") Integer disbursementId
+    ) {
+        return ResponseApi.success(
+                "Disbursement fetched",
+                service.getDisbursementById(disbursementId)
+        );
+    }
+
+    @GetMapping("/deal/{dealId}/latest")
+    public ResponseApi<DisbursementDetailsResponse> getLatest(
+            @PathVariable("dealId") Integer dealId
+    ) {
+        return ResponseApi.success(
+                "Latest application disbursement fetched",
+                service.getLatestDisbursementByDealId(dealId)
+        );
+    }
+
+    @GetMapping("/deal/{dealId}")
+    public ResponseApi<PageResponse<DisbursementDetailsResponse>> getHistory(
+            @PathVariable("dealId") Integer dealId,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size
+    ) {
+        return ResponseApi.success(
+                "Application disbursement history fetched",
+                service.getDealDisbursements(dealId, page, size)
         );
     }
 }

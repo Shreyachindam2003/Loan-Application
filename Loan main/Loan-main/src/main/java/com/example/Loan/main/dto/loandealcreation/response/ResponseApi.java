@@ -17,13 +17,21 @@ public class ResponseApi<T> {
             String message,
             T data
     ) {
-        return new ResponseApi<>(true, message, data);
+        return new ResponseApi<>(
+                true,
+                message,
+                data
+        );
     }
 
     public static <T> ResponseApi<T> failure(
             String message,
             T data
     ) {
-        return new ResponseApi<>(false, message, data);
+        return new ResponseApi<>(
+                false,
+                message,
+                data
+        );
     }
-}//dada
+}

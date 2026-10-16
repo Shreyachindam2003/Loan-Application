@@ -10,7 +10,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/health")
 public class HealthController {
-    //dada
+
     @GetMapping
     public ResponseApi<Map<String, String>> health() {
         return ResponseApi.success(
