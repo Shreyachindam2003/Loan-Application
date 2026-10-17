@@ -11,8 +11,6 @@ import org.springframework.stereotype.Repository;
 public interface ForeClosureRequestRepository
         extends JpaRepository<ForeClosureRequest, Integer> {
 
-    List<ForeClosureRequest> findByLoanAccountId(Integer loanAccountId);
-
     List<ForeClosureRequest>
     findByLoanAccountIdAndForeClosureTypeIgnoreCaseAndIsPaidTrue(
             Integer loanAccountId, String foreClosureType);

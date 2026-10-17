@@ -1,4 +1,4 @@
-package com.example.Loan.main.dto.response;
+package com.example.Loan.main.config;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,8 +12,7 @@ import lombok.NoArgsConstructor;
 public class ApiResponse<T> {
 
     private boolean success;
-
     private String message;
-
     private T data;
 }
+

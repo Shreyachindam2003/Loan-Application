@@ -46,7 +46,6 @@ public class PenaltyServiceImpl implements PenaltyService {
         BigDecimal zero = BigDecimal.ZERO;
         LocalDate today = LocalDate.now();
 
-        // Existing saved charges
         for (PenaltyCharge charge : penaltyRepo.findByLoanAccountId(loanAccountId)) {
 
             Integer emiId = charge.getEmiScheduleId();

@@ -8,6 +8,10 @@ import java.time.YearMonth;
 import java.util.List;
 
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,6 +52,7 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
     private final ForeClosureRequestRepository foreClosureRepo;
     private final ModelMapper mapper;
 
+    //@Cacheable(value = "emiSchedules", key = "#loanAccountId")
     @Override
     @Transactional(readOnly = true)
     public List<EmiScheduleResponse> getEmiSchedule(Integer loanId) {
@@ -59,6 +64,21 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
                 emiRepo.findByLoanAccountIdOrderByInstallmentNoAsc(loanId));
     }
 
+    /*@Transactional(readOnly = true)
+    @Override
+    public Page<EmiScheduleResponse> getEmiSchedule(
+            Integer loanId, Pageable pageable) {
+
+        if (!accountRepo.existsById(loanId)) {
+            throw new ResourceNotFoundException(
+                    "Loan account not found: " + loanId);
+        }
+
+        return emiRepo
+                .findByLoanAccountIdOrderByInstallmentNoAsc(loanId, pageable)
+                .map(e -> mapper.map(e, EmiScheduleResponse.class));
+    }*/
+
     @Override
     @Transactional(readOnly = true)
     public EmiScheduleResponse getEmiById(Integer id) {
@@ -69,6 +89,7 @@ public class EmiScheduleServiceImpl implements EmiScheduleService {
         return mapper.map(emi, EmiScheduleResponse.class);
     }
 
+    //@CacheEvict(value = "emiSchedules", key = "#loanAccountId")
     @Override
     @Transactional
     public List<EmiScheduleResponse> generateEmiSchedule(Integer loanId) {

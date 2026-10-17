@@ -7,6 +7,8 @@ import java.util.Optional;
 
 import com.example.Loan.main.entity.EmiSchedule;
 import com.example.Loan.main.enums.EmiStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 
@@ -17,17 +19,10 @@ public interface EmiScheduleRepository
     List<EmiSchedule> findByLoanAccountIdOrderByInstallmentNoAsc(
             Integer loanAccountId);
 
-    Optional<EmiSchedule> findFirstByLoanAccountIdAndStatusOrderByInstallmentNoAsc(
-            Integer loanAccountId,
-            EmiStatus status);
 
-    List<EmiSchedule> findByLoanAccountIdAndStatus(
-            Integer loanAccountId,
-            EmiStatus status);
+    Page<EmiSchedule> findByLoanAccountIdOrderByInstallmentNoAsc(
+            Integer loanAccountId, Pageable pageable);
 
-    Optional<EmiSchedule> findByLoanAccountIdAndInstallmentNo(
-            Integer loanAccountId,
-            Integer installmentNo);
 
     List<EmiSchedule> findByStatus(EmiStatus status);
 

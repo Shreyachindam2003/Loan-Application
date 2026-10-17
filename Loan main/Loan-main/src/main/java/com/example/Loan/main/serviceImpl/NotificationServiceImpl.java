@@ -28,48 +28,33 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public List<NotificationResponse> getNotifications(Integer customerId) {
 
-        return notificationRepo
-                .findByCustomerIdOrderByCreatedAtDesc(customerId)
+        return notificationRepo.findByCustomerIdOrderByCreatedAtDesc(customerId)
                 .stream()
-                .map(notification ->
-                        modelMapper.map(notification, NotificationResponse.class))
+                .map(notification ->modelMapper.map(notification, NotificationResponse.class))
                 .toList();
     }
 
-    // Get unread notifications
-    public List<NotificationResponse> getUnreadNotifications(
-            Integer customerId) {
+    public List<NotificationResponse> getUnreadNotifications(Integer customerId) {
 
-        return notificationRepo
-                .findByCustomerIdAndIsReadFalseOrderByCreatedAtDesc(customerId)
+        return notificationRepo.findByCustomerIdAndIsReadFalseOrderByCreatedAtDesc(customerId)
                 .stream()
-                .map(notification ->
-                        modelMapper.map(notification, NotificationResponse.class))
+                .map(notification ->modelMapper.map(notification, NotificationResponse.class))
                 .toList();
     }
 
-    // Mark notification as read
     @Override
     @Transactional
     public void markAsRead(Integer notificationId) {
 
         Notification notification = notificationRepo.findById(notificationId)
-                .orElseThrow(() ->
-                        new NotificationNotFoundException(
-                                "Notification not found: " + notificationId));
-
+                .orElseThrow(() -> new NotificationNotFoundException("Notification not found: " + notificationId));
         notification.setIsRead(true);
         notificationRepo.save(notification);
     }
 
-    // Create EMI reminder once per EMI per day
     @Override
     @Transactional
-    public boolean createEmiReminder(
-            Integer customerId,
-            String title,
-            String message,
-            Integer emiScheduleId) {
+    public boolean createEmiReminder(Integer customerId, String title, String message, Integer emiScheduleId) {
 
         if (customerId == null || customerId <= 0) {
             throw new IllegalArgumentException("Invalid customer ID");
@@ -89,11 +74,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         boolean alreadyExists = notificationRepo
                 .findFirstByCustomerIdAndReferenceIdAndNotificationTypeAndCreatedAtBetween(
-                        customerId,
-                        emiScheduleId,
-                        NotificationType.EMI_REMINDER,
-                        start,
-                        end)
+                        customerId, emiScheduleId, NotificationType.EMI_REMINDER, start,end)
                 .isPresent();
 
         if (alreadyExists) {
@@ -102,10 +83,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         Notification notification = new Notification();
         notification.setCustomerId(customerId);
-        notification.setTitle(
-                title == null || title.isBlank()
-                        ? "EMI Payment Reminder"
-                        : title);
+        notification.setTitle(title == null || title.isBlank() ? "EMI Payment Reminder" : title);
         notification.setMessage(message);
         notification.setNotificationType(NotificationType.EMI_REMINDER);
         notification.setReferenceId(emiScheduleId);
@@ -125,11 +103,8 @@ public class NotificationServiceImpl implements NotificationService {
             String message,
             Integer emiScheduleId) {
 
-        boolean exists = notificationRepo
-                .existsByCustomerIdAndReferenceIdAndNotificationType(
-                        customerId,
-                        emiScheduleId,
-                        NotificationType.OVERDUE_EMI);
+        boolean exists = notificationRepo.existsByCustomerIdAndReferenceIdAndNotificationType(
+                        customerId, emiScheduleId, NotificationType.OVERDUE_EMI);
 
         if (exists) {
             return false;

@@ -318,8 +318,7 @@ public class PaymentServiceImpl implements PaymentService {
             throw new InvalidPaymentException("Valid EMI schedule ID is required");
         }
 
-        return emiRepo.findById(id)
-                .orElseThrow(() -> new EmiNotFoundException(
+        return emiRepo.findById(id).orElseThrow(() -> new EmiNotFoundException(
                         "EMI schedule not found: " + id));
     }
 

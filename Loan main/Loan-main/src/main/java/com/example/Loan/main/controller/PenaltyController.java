@@ -2,7 +2,7 @@ package com.example.Loan.main.controller;
 
 import java.util.List;
 
-import com.example.Loan.main.dto.response.ApiResponse;
+import com.example.Loan.main.config.ApiResponse;
 import com.example.Loan.main.dto.response.PenaltyResponse;
 import com.example.Loan.main.service.PenaltyService;
 
@@ -21,22 +21,17 @@ public class PenaltyController {
 
     private final PenaltyService penaltyService;
 
-    // Get all penalties and bonus charges for a loan
     @GetMapping("/loan/{loanAccountId}")
-    public ResponseEntity<ApiResponse<List<PenaltyResponse>>> getPenalties(
-            @PathVariable Integer loanAccountId) {
+    public ResponseEntity<ApiResponse<List<PenaltyResponse>>> getPenalties(@PathVariable Integer loanAccountId) {
 
-        log.info("Fetching penalty and bonus charges for loanAccountId: {}",
-                loanAccountId);
+        log.info("Fetching penalty and bonus charges for loanAccountId: {}",loanAccountId);
 
-        List<PenaltyResponse> data =
-                penaltyService.getPenalties(loanAccountId);
+        List<PenaltyResponse> data =penaltyService.getPenalties(loanAccountId);
 
         log.info("Penalty and bonus charges fetched successfully for loanAccountId: {}, count: {}",
                 loanAccountId, data.size());
 
-        return ResponseEntity.ok(
-                ApiResponse.<List<PenaltyResponse>>builder()
+        return ResponseEntity.ok(ApiResponse.<List<PenaltyResponse>>builder()
                         .success(true)
                         .message("Penalty and bonus charges fetched successfully")
                         .data(data)
@@ -46,20 +41,15 @@ public class PenaltyController {
 
     // Get single penalty/bonus detail
     @GetMapping("/{penaltyChargeId}")
-    public ResponseEntity<ApiResponse<PenaltyResponse>> getPenalty(
-            @PathVariable Integer penaltyChargeId) {
+    public ResponseEntity<ApiResponse<PenaltyResponse>> getPenalty(@PathVariable Integer penaltyChargeId) {
 
-        log.info("Fetching penalty details for penaltyChargeId: {}",
-                penaltyChargeId);
+        log.info("Fetching penalty details for penaltyChargeId: {}",penaltyChargeId);
 
-        PenaltyResponse data =
-                penaltyService.getPenalty(penaltyChargeId);
+        PenaltyResponse data =penaltyService.getPenalty(penaltyChargeId);
 
-        log.info("Penalty details fetched successfully for penaltyChargeId: {}",
-                penaltyChargeId);
+        log.info("Penalty details fetched successfully for penaltyChargeId: {}",penaltyChargeId);
 
-        return ResponseEntity.ok(
-                ApiResponse.<PenaltyResponse>builder()
+        return ResponseEntity.ok(ApiResponse.<PenaltyResponse>builder()
                         .success(true)
                         .message("Penalty details fetched successfully")
                         .data(data)
