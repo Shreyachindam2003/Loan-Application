@@ -1,0 +1,120 @@
+-- ------------------------------------------------------------
+-- Customers
+-- ------------------------------------------------------------
+drop table Customers;
+CREATE TABLE Customers (
+    CustomerId INT NOT NULL AUTO_INCREMENT,
+    FirstName VARCHAR(255) NOT NULL,
+    LastName VARCHAR(255) NULL,
+    Email VARCHAR(255) NOT NULL,
+    Password VARCHAR(255) NULL,
+    MobileNo VARCHAR(255) NULL,
+    AadhaarNo VARCHAR(255) NULL,
+    PanNo VARCHAR(255) NULL,
+    Age INT NULL,
+    EmploymentType VARCHAR(255) NULL,
+    MonthlyIncome DECIMAL(38,2) NULL,
+    MonthlyInvestment DECIMAL(38,2) NULL,
+    IsEmailVerified BIT(1) NOT NULL,
+    VerificationOtpHash VARCHAR(255) NULL,
+    VerificationOtpExpiry DATETIME(6) NULL,
+    CreatedAt DATETIME(6) NOT NULL,
+
+    PRIMARY KEY (CustomerId),
+    UNIQUE KEY UX_Customers_Email (Email)
+) ENGINE=InnoDB;
+
+
+-- ------------------------------------------------------------
+-- CIBIL reports
+-- ------------------------------------------------------------
+CREATE TABLE CibilReports (
+    CibilReportId INT NOT NULL AUTO_INCREMENT,
+    CustomerId INT NOT NULL,
+    PanNo VARCHAR(255) NULL,
+    CibilScore INT NULL,
+    CheckDate DATETIME(6) NULL,
+    Status VARCHAR(255) NULL,
+    PRIMARY KEY (CibilReportId),
+    UNIQUE KEY UX_CibilReports_CustomerId (CustomerId),
+    CONSTRAINT FK_CibilReports_Customers
+        FOREIGN KEY (CustomerId)
+        REFERENCES Customers(CustomerId)
+) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
+-- KYC documents
+-- ------------------------------------------------------------
+CREATE TABLE KycDocuments (
+    DocumentId INT NOT NULL AUTO_INCREMENT,
+    CustomerId INT NOT NULL,
+    DocumentType VARCHAR(100) NOT NULL,
+    FilePath VARCHAR(1000) NULL,
+    VerificationStatus VARCHAR(50) NULL,
+    PRIMARY KEY (DocumentId),
+    KEY IX_KycDocuments_CustomerId (CustomerId),
+    CONSTRAINT FK_KycDocuments_Customers
+        FOREIGN KEY (CustomerId) REFERENCES Customers(CustomerId)
+) ENGINE=InnoDB;
+
+
+
+-- ------------------------------------------------------------
+-- Eligibility results
+-- ------------------------------------------------------------
+CREATE TABLE EligibilityResults (
+    EligibilityId INT NOT NULL AUTO_INCREMENT,
+    CustomerId INT NOT NULL,
+    CibilScore INT NULL,
+    IsEligible BIT(1) NULL,
+    Status VARCHAR(255) NULL,
+    LoanAmount DECIMAL(38,2) NULL,
+    RejectionReason VARCHAR(255) NULL,
+    PRIMARY KEY (EligibilityId),
+    UNIQUE KEY UX_EligibilityResults_CustomerId (CustomerId),
+    CONSTRAINT FK_EligibilityResults_Customers
+        FOREIGN KEY (CustomerId)
+        REFERENCES Customers(CustomerId)
+
+) ENGINE=InnoDB;
+CREATE TABLE Notifications (
+    NotificationId INT NOT NULL AUTO_INCREMENT,
+    CustomerId INT NOT NULL,
+    Message VARCHAR(1000) NOT NULL,
+    IsRead BOOLEAN NOT NULL DEFAULT FALSE,
+    CreatedAt DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    NotificationType VARCHAR(50) NULL,
+    ReferenceId INT NULL,
+    Title VARCHAR(255) NULL,
+
+    PRIMARY KEY (NotificationId),
+
+    KEY IX_Notifications_CustomerId (CustomerId),
+
+    CONSTRAINT FK_Notifications_Customers
+        FOREIGN KEY (CustomerId) REFERENCES Customers(CustomerId)
+
+) ENGINE=InnoDB;
+
+INSERT INTO Customers
+(
+    FirstName, LastName, Email, Password, MobileNo,
+    AadhaarNo, PanNo, Age, EmploymentType,
+    MonthlyIncome, MonthlyInvestment,
+    IsEmailVerified, VerificationOtpHash,
+    VerificationOtpExpiry, CreatedAt
+)
+VALUES
+(
+    'rahuee', 'Shindes',
+    'rahuree.shindesi@gmail.com',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+    '9876543214',
+    '123456789016',
+    'EFGHI5678K',
+    35,
+    'Private',
+    50000.00,
+    18000.00,
+    b'1', NULL, NULL, NOW()
+);
